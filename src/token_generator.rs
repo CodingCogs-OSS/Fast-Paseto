@@ -15,6 +15,84 @@ use rand::{RngCore, rngs::OsRng};
 pub struct TokenGenerator;
 
 impl TokenGenerator {
+    /// Generate a v4.public token (asymmetric signing)
+    ///
+    /// Uses Ed25519 signatures for token authentication.
+    ///
+    /// # Arguments
+    /// * `secret_key` - 64-byte Ed25519 secret key
+    /// * `payload` - Token payload as bytes
+    /// * `footer` - Optional footer data
+    /// * `implicit_assertion` - Optional implicit assertion
+    ///
+    /// # Returns
+    /// * `Result<String, PasetoError>` - Token string or error
+    ///
+    /// # Errors
+    /// Returns `PasetoError::InvalidKeyLength` if secret key is not 64 bytes
+    /// Returns `PasetoError::InvalidKeyFormat` if secret key is not a valid Ed25519 key
+    ///
+    /// # Token Format
+    /// `v4.public.base64url(payload || signature)[.base64url(footer)]`
+    pub fn v4_public_sign(
+        secret_key: &[u8],
+        payload: &[u8],
+        footer: Option<&[u8]>,
+        implicit_assertion: Option<&[u8]>,
+    ) -> Result<String, PasetoError> {
+        use ed25519_dalek::{Signer, SigningKey};
+
+        // Validate key length
+        if secret_key.len() != 64 {
+            return Err(PasetoError::InvalidKeyLength {
+                expected: 64,
+                actual: secret_key.len(),
+            });
+        }
+
+        // Convert to Ed25519 signing key
+        let key_bytes: [u8; 64] = secret_key.try_into().unwrap();
+        let signing_key = SigningKey::from_keypair_bytes(&key_bytes)
+            .map_err(|e| PasetoError::InvalidKeyFormat(format!("Invalid Ed25519 key: {}", e)))?;
+
+        // Build pre-authentication encoding for signature
+        // PAE(version.purpose, payload, footer, implicit_assertion)
+        let header = b"v4.public.";
+        let footer_bytes = footer.unwrap_or(b"");
+        let implicit_bytes = implicit_assertion.unwrap_or(b"");
+
+        let pae_pieces: Vec<&[u8]> = vec![
+            header,
+            payload,
+            footer_bytes,
+            implicit_bytes,
+        ];
+        let m2 = Pae::encode(&pae_pieces);
+
+        // Sign the PAE
+        let signature = signing_key.sign(&m2);
+
+        // Concatenate payload || signature
+        let mut token_bytes = Vec::with_capacity(payload.len() + 64);
+        token_bytes.extend_from_slice(payload);
+        token_bytes.extend_from_slice(&signature.to_bytes());
+
+        // Encode as base64url
+        let encoded_payload = URL_SAFE_NO_PAD.encode(&token_bytes);
+
+        // Build final token string
+        let mut token = format!("v4.public.{}", encoded_payload);
+        if let Some(f) = footer {
+            if !f.is_empty() {
+                let encoded_footer = URL_SAFE_NO_PAD.encode(f);
+                token.push('.');
+                token.push_str(&encoded_footer);
+            }
+        }
+
+        Ok(token)
+    }
+
     /// Generate a v4.local token (symmetric encryption)
     ///
     /// Uses XChaCha20 encryption with BLAKE2b-MAC for authenticated encryption.
@@ -235,6 +313,142 @@ mod tests {
         assert_eq!(parts.len(), 3);
         assert_eq!(parts[0], "v4");
         assert_eq!(parts[1], "local");
+
+        // Payload should be valid base64url
+        let decode_result = URL_SAFE_NO_PAD.decode(parts[2]);
+        assert!(decode_result.is_ok());
+    }
+
+    // v4.public tests
+    #[test]
+    fn test_v4_public_sign_basic() {
+        use crate::key_generator::KeyGenerator;
+
+        let keypair = KeyGenerator::generate_ed25519_keypair();
+        let payload = b"test payload";
+        let result = TokenGenerator::v4_public_sign(&keypair.secret_key, payload, None, None);
+        assert!(result.is_ok());
+
+        let token = result.unwrap();
+        assert!(token.starts_with("v4.public."));
+    }
+
+    #[test]
+    fn test_v4_public_sign_with_footer() {
+        use crate::key_generator::KeyGenerator;
+
+        let keypair = KeyGenerator::generate_ed25519_keypair();
+        let payload = b"test payload";
+        let footer = b"test footer";
+        let result = TokenGenerator::v4_public_sign(&keypair.secret_key, payload, Some(footer), None);
+        assert!(result.is_ok());
+
+        let token = result.unwrap();
+        assert!(token.starts_with("v4.public."));
+
+        // Token should have 4 parts when footer is present
+        let parts: Vec<&str> = token.split('.').collect();
+        assert_eq!(parts.len(), 4);
+    }
+
+    #[test]
+    fn test_v4_public_sign_with_implicit_assertion() {
+        use crate::key_generator::KeyGenerator;
+
+        let keypair = KeyGenerator::generate_ed25519_keypair();
+        let payload = b"test payload";
+        let implicit = b"test implicit assertion";
+        let result = TokenGenerator::v4_public_sign(&keypair.secret_key, payload, None, Some(implicit));
+        assert!(result.is_ok());
+
+        let token = result.unwrap();
+        assert!(token.starts_with("v4.public."));
+    }
+
+    #[test]
+    fn test_v4_public_sign_invalid_key_length() {
+        let key = [0u8; 32]; // Wrong length (should be 64)
+        let payload = b"test payload";
+        let result = TokenGenerator::v4_public_sign(&key, payload, None, None);
+        assert!(result.is_err());
+
+        match result {
+            Err(PasetoError::InvalidKeyLength { expected, actual }) => {
+                assert_eq!(expected, 64);
+                assert_eq!(actual, 32);
+            }
+            _ => panic!("Expected InvalidKeyLength error"),
+        }
+    }
+
+    #[test]
+    fn test_v4_public_sign_invalid_key_format() {
+        let key = [0u8; 64]; // Correct length but invalid key
+        let payload = b"test payload";
+        let result = TokenGenerator::v4_public_sign(&key, payload, None, None);
+        assert!(result.is_err());
+
+        match result {
+            Err(PasetoError::InvalidKeyFormat(_)) => {
+                // Expected
+            }
+            _ => panic!("Expected InvalidKeyFormat error"),
+        }
+    }
+
+    #[test]
+    fn test_v4_public_sign_empty_payload() {
+        use crate::key_generator::KeyGenerator;
+
+        let keypair = KeyGenerator::generate_ed25519_keypair();
+        let payload = b"";
+        let result = TokenGenerator::v4_public_sign(&keypair.secret_key, payload, None, None);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_v4_public_sign_empty_footer() {
+        use crate::key_generator::KeyGenerator;
+
+        let keypair = KeyGenerator::generate_ed25519_keypair();
+        let payload = b"test payload";
+        let footer = b"";
+        let result = TokenGenerator::v4_public_sign(&keypair.secret_key, payload, Some(footer), None);
+        assert!(result.is_ok());
+
+        let token = result.unwrap();
+        // Empty footer should not add a fourth part
+        let parts: Vec<&str> = token.split('.').collect();
+        assert_eq!(parts.len(), 3);
+    }
+
+    #[test]
+    fn test_v4_public_sign_deterministic() {
+        use crate::key_generator::KeyGenerator;
+
+        // Same key and payload should produce the same token (Ed25519 is deterministic)
+        let keypair = KeyGenerator::generate_ed25519_keypair();
+        let payload = b"test payload";
+
+        let token1 = TokenGenerator::v4_public_sign(&keypair.secret_key, payload, None, None).unwrap();
+        let token2 = TokenGenerator::v4_public_sign(&keypair.secret_key, payload, None, None).unwrap();
+
+        assert_eq!(token1, token2, "Ed25519 signatures should be deterministic");
+    }
+
+    #[test]
+    fn test_v4_public_sign_token_format() {
+        use crate::key_generator::KeyGenerator;
+
+        let keypair = KeyGenerator::generate_ed25519_keypair();
+        let payload = b"test payload";
+        let token = TokenGenerator::v4_public_sign(&keypair.secret_key, payload, None, None).unwrap();
+
+        // Token should have format: v4.public.base64url_payload
+        let parts: Vec<&str> = token.split('.').collect();
+        assert_eq!(parts.len(), 3);
+        assert_eq!(parts[0], "v4");
+        assert_eq!(parts[1], "public");
 
         // Payload should be valid base64url
         let decode_result = URL_SAFE_NO_PAD.decode(parts[2]);
@@ -467,6 +681,68 @@ mod tests {
                 matches!(result, Err(PasetoError::InvalidTokenFormat(_))),
                 "Invalid token format must produce InvalidTokenFormat error"
             );
+        }
+
+        /// **Feature: paseto-implementation, Property 2: Public Token Round-Trip**
+        /// **Validates: Requirements 3.1, 3.2, 4.1**
+        ///
+        /// For any valid Ed25519 key pair, any valid payload (as bytes), any optional footer, and
+        /// any optional implicit assertion, signing the payload with the secret key to create a
+        /// v4.public token and then verifying that token with the corresponding public key, footer,
+        /// and implicit assertion SHALL return the original payload.
+        #[test]
+        fn prop_public_token_roundtrip(
+            payload in prop::collection::vec(any::<u8>(), 0..1000),
+            footer in prop::option::of(prop::collection::vec(any::<u8>(), 0..100)),
+            implicit in prop::option::of(prop::collection::vec(any::<u8>(), 0..100)),
+        ) {
+            use crate::key_generator::KeyGenerator;
+
+            // Generate a fresh key pair for each test
+            let keypair = KeyGenerator::generate_ed25519_keypair();
+
+            let token = TokenGenerator::v4_public_sign(
+                &keypair.secret_key,
+                &payload,
+                footer.as_deref(),
+                implicit.as_deref(),
+            )?;
+
+            let verifier = TokenVerifier::new(None);
+            let verified = verifier.v4_public_verify(
+                &token,
+                &keypair.public_key,
+                footer.as_deref(),
+                implicit.as_deref(),
+            )?;
+
+            prop_assert_eq!(payload, verified, "Round-trip must preserve payload");
+        }
+
+        /// **Feature: paseto-implementation, Property 5: Ed25519 Key Format Validation**
+        /// **Validates: Requirements 3.3**
+        ///
+        /// For any byte array that is not a valid Ed25519 secret key (wrong length or invalid format),
+        /// attempting to create a v4.public token SHALL raise a key validation error.
+        #[test]
+        fn prop_ed25519_key_format_validation(
+            key_len in 0usize..256usize,
+            payload in prop::collection::vec(any::<u8>(), 0..100),
+        ) {
+            // Skip the valid key length
+            prop_assume!(key_len != 64);
+
+            let key = vec![0u8; key_len];
+            let result = TokenGenerator::v4_public_sign(&key, &payload, None, None);
+
+            prop_assert!(result.is_err(), "Invalid key length must produce error");
+
+            if let Err(PasetoError::InvalidKeyLength { expected, actual }) = result {
+                prop_assert_eq!(expected, 64, "Expected key length must be 64");
+                prop_assert_eq!(actual, key_len, "Actual key length must match input");
+            } else {
+                return Err(proptest::test_runner::TestCaseError::fail("Expected InvalidKeyLength error"));
+            }
         }
     }
 }

@@ -392,5 +392,45 @@ mod tests {
                 .expect("Decoding valid base64 should always succeed");
             prop_assert_eq!(key_bytes, decoded, "Round-trip encoding/decoding must preserve key bytes");
         }
+
+        /// **Feature: paseto-implementation, Property 11: Ed25519 Key Pair Validity**
+        /// **Validates: Requirements 5.2**
+        ///
+        /// For any generated Ed25519 key pair, the secret key and public key SHALL be usable to sign
+        /// and verify a token respectively, and the round-trip property (Property 2) SHALL hold.
+        #[test]
+        fn prop_ed25519_keypair_validity(_dummy in 0u8..255u8) {
+            use crate::token_generator::TokenGenerator;
+            use crate::token_verifier::TokenVerifier;
+
+            // Generate a key pair
+            let keypair = KeyGenerator::generate_ed25519_keypair();
+
+            // Create a test payload
+            let payload = b"test payload for key pair validity";
+
+            // Sign with the secret key
+            let token = TokenGenerator::v4_public_sign(
+                &keypair.secret_key,
+                payload,
+                None,
+                None,
+            ).expect("Signing with generated key pair should succeed");
+
+            // Verify with the public key
+            let verifier = TokenVerifier::new(None);
+            let verified = verifier.v4_public_verify(
+                &token,
+                &keypair.public_key,
+                None,
+                None,
+            ).expect("Verification with generated key pair should succeed");
+
+            prop_assert_eq!(
+                payload.to_vec(),
+                verified,
+                "Generated key pair must be usable for signing and verification"
+            );
+        }
     }
 }

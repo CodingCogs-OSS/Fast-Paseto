@@ -1,5 +1,6 @@
 use pyo3::prelude::*;
 
+pub mod claims_manager;
 pub mod error;
 pub mod key_generator;
 pub mod pae;
@@ -8,6 +9,7 @@ pub mod token_generator;
 pub mod token_verifier;
 pub mod version;
 
+pub use claims_manager::ClaimsManager;
 pub use error::PasetoError;
 pub use key_generator::{Ed25519KeyPair, KeyGenerator};
 pub use pae::Pae;
