@@ -1,5 +1,13 @@
 use pyo3::prelude::*;
 
+pub mod error;
+pub mod payload;
+pub mod version;
+
+pub use error::PasetoError;
+pub use payload::TokenPayload;
+pub use version::{Purpose, Version};
+
 /// A Python module implemented in Rust.
 #[pymodule]
 mod fast_paseto {
