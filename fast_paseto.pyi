@@ -51,6 +51,107 @@ class Token:
     def __contains__(self, key: str) -> bool: ...
     def to_dict(self) -> Dict[str, Any]: ...
 
+class Paseto:
+    """Configurable Paseto instance with preset defaults.
+
+    A Paseto instance allows you to configure default behavior for token
+    operations, such as automatic expiration times, issued-at timestamps,
+    and time-based claim validation leeway.
+
+    Attributes:
+        default_exp: Default expiration time in seconds (added to current time)
+        include_iat: Whether to automatically include issued-at (iat) claim
+        leeway: Time tolerance in seconds for time-based claim validation
+    """
+
+    default_exp: Optional[int]
+    include_iat: bool
+    leeway: int
+
+    def __init__(
+        self,
+        default_exp: Optional[int] = None,
+        include_iat: bool = True,
+        leeway: int = 0,
+    ) -> None:
+        """Create a new Paseto instance with configuration.
+
+        Args:
+            default_exp: Default expiration time in seconds (added to current time).
+                         If set, tokens will automatically get an exp claim. Default: None
+            include_iat: Whether to automatically include issued-at (iat) claim.
+                         Default: True
+            leeway: Time tolerance in seconds for time-based claim validation.
+                    Default: 0
+        """
+        ...
+
+    def encode(
+        self,
+        key: Union[bytes, str],
+        payload: Dict[str, Any],
+        purpose: str = "local",
+        version: str = "v4",
+        footer: Optional[Union[bytes, str, Dict[str, Any]]] = None,
+        implicit_assertion: Optional[bytes] = None,
+    ) -> str:
+        """Encode a PASETO token with configured defaults.
+
+        Creates a PASETO token from a payload dict, automatically applying
+        configured defaults (exp, iat) if not already present in the payload.
+
+        Args:
+            key: The cryptographic key (bytes or str)
+            payload: The payload data as a Python dict
+            purpose: Token purpose - "local" or "public". Default: "local"
+            version: PASETO version - "v2", "v3", or "v4". Default: "v4"
+            footer: Optional footer data (bytes, str, or dict). Default: None
+            implicit_assertion: Optional implicit assertion (bytes). Default: None
+
+        Returns:
+            str: The encoded PASETO token string
+
+        Raises:
+            PasetoKeyError: If the key format or length is invalid
+            PasetoValidationError: If the payload cannot be serialized
+            PasetoCryptoError: If encryption/signing fails
+        """
+        ...
+
+    def decode(
+        self,
+        token: str,
+        key: Union[bytes, str],
+        purpose: str = "local",
+        version: str = "v4",
+        footer: Optional[Union[bytes, str, Dict[str, Any]]] = None,
+        implicit_assertion: Optional[bytes] = None,
+    ) -> Token:
+        """Decode a PASETO token with configured leeway.
+
+        Verifies and decrypts a PASETO token, applying the configured leeway
+        for time-based claim validation.
+
+        Args:
+            token: The PASETO token string to decode
+            key: The cryptographic key (bytes or str)
+            purpose: Token purpose - "local" or "public". Default: "local"
+            version: PASETO version - "v2", "v3", or "v4". Default: "v4"
+            footer: Optional expected footer data (bytes, str, or dict). Default: None
+            implicit_assertion: Optional implicit assertion (bytes). Default: None
+
+        Returns:
+            Token: A Token object with payload, footer, version, and purpose
+
+        Raises:
+            PasetoKeyError: If the key format or length is invalid
+            PasetoValidationError: If the token format is invalid
+            PasetoCryptoError: If decryption/verification fails
+            PasetoExpiredError: If the token has expired
+            PasetoNotYetValidError: If the token is not yet valid
+        """
+        ...
+
 def generate_symmetric_key() -> bytes:
     """Generate a random 32-byte symmetric key for v4.local tokens."""
     ...
