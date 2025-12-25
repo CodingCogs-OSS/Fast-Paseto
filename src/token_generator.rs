@@ -4,11 +4,11 @@
 
 use crate::error::PasetoError;
 use crate::pae::Pae;
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use blake2::Blake2bMac512;
-use blake2::digest::{Mac, KeyInit};
-use chacha20::cipher::{KeyIvInit, StreamCipher};
+use blake2::digest::{KeyInit, Mac};
 use chacha20::XChaCha20;
+use chacha20::cipher::{KeyIvInit, StreamCipher};
 use rand::{RngCore, rngs::OsRng};
 
 /// Token generation for all PASETO versions
@@ -61,12 +61,7 @@ impl TokenGenerator {
         let footer_bytes = footer.unwrap_or(b"");
         let implicit_bytes = implicit_assertion.unwrap_or(b"");
 
-        let pae_pieces: Vec<&[u8]> = vec![
-            header,
-            payload,
-            footer_bytes,
-            implicit_bytes,
-        ];
+        let pae_pieces: Vec<&[u8]> = vec![header, payload, footer_bytes, implicit_bytes];
         let m2 = Pae::encode(&pae_pieces);
 
         // Sign the PAE
@@ -140,8 +135,9 @@ impl TokenGenerator {
         let mut ek_input = Vec::new();
         ek_input.extend_from_slice(b"paseto-encryption-key");
         ek_input.extend_from_slice(&nonce);
-        let mut ek_mac = <Blake2bMac512 as KeyInit>::new_from_slice(&key_array)
-            .map_err(|e| PasetoError::CryptoError(format!("EK MAC initialization failed: {}", e)))?;
+        let mut ek_mac = <Blake2bMac512 as KeyInit>::new_from_slice(&key_array).map_err(|e| {
+            PasetoError::CryptoError(format!("EK MAC initialization failed: {}", e))
+        })?;
         ek_mac.update(&ek_input);
         let ek_result = ek_mac.finalize();
         let ek: [u8; 32] = ek_result.into_bytes()[..32].try_into().unwrap();
@@ -149,8 +145,9 @@ impl TokenGenerator {
         let mut ak_input = Vec::new();
         ak_input.extend_from_slice(b"paseto-auth-key-for-aead");
         ak_input.extend_from_slice(&nonce);
-        let mut ak_mac = <Blake2bMac512 as KeyInit>::new_from_slice(&key_array)
-            .map_err(|e| PasetoError::CryptoError(format!("AK MAC initialization failed: {}", e)))?;
+        let mut ak_mac = <Blake2bMac512 as KeyInit>::new_from_slice(&key_array).map_err(|e| {
+            PasetoError::CryptoError(format!("AK MAC initialization failed: {}", e))
+        })?;
         ak_mac.update(&ak_input);
         let ak_result = ak_mac.finalize();
         let ak: [u8; 32] = ak_result.into_bytes()[..32].try_into().unwrap();
@@ -168,13 +165,8 @@ impl TokenGenerator {
         let footer_bytes = footer.unwrap_or(b"");
         let implicit_bytes = implicit_assertion.unwrap_or(b"");
 
-        let pae_pieces: Vec<&[u8]> = vec![
-            header,
-            &nonce,
-            &ciphertext,
-            footer_bytes,
-            implicit_bytes,
-        ];
+        let pae_pieces: Vec<&[u8]> =
+            vec![header, &nonce, &ciphertext, footer_bytes, implicit_bytes];
         let pae = Pae::encode(&pae_pieces);
 
         // Compute authentication tag using BLAKE2b-MAC
@@ -340,7 +332,8 @@ mod tests {
         let keypair = KeyGenerator::generate_ed25519_keypair();
         let payload = b"test payload";
         let footer = b"test footer";
-        let result = TokenGenerator::v4_public_sign(&keypair.secret_key, payload, Some(footer), None);
+        let result =
+            TokenGenerator::v4_public_sign(&keypair.secret_key, payload, Some(footer), None);
         assert!(result.is_ok());
 
         let token = result.unwrap();
@@ -358,7 +351,8 @@ mod tests {
         let keypair = KeyGenerator::generate_ed25519_keypair();
         let payload = b"test payload";
         let implicit = b"test implicit assertion";
-        let result = TokenGenerator::v4_public_sign(&keypair.secret_key, payload, None, Some(implicit));
+        let result =
+            TokenGenerator::v4_public_sign(&keypair.secret_key, payload, None, Some(implicit));
         assert!(result.is_ok());
 
         let token = result.unwrap();
@@ -413,7 +407,8 @@ mod tests {
         let keypair = KeyGenerator::generate_ed25519_keypair();
         let payload = b"test payload";
         let footer = b"";
-        let result = TokenGenerator::v4_public_sign(&keypair.secret_key, payload, Some(footer), None);
+        let result =
+            TokenGenerator::v4_public_sign(&keypair.secret_key, payload, Some(footer), None);
         assert!(result.is_ok());
 
         let token = result.unwrap();
@@ -430,8 +425,10 @@ mod tests {
         let keypair = KeyGenerator::generate_ed25519_keypair();
         let payload = b"test payload";
 
-        let token1 = TokenGenerator::v4_public_sign(&keypair.secret_key, payload, None, None).unwrap();
-        let token2 = TokenGenerator::v4_public_sign(&keypair.secret_key, payload, None, None).unwrap();
+        let token1 =
+            TokenGenerator::v4_public_sign(&keypair.secret_key, payload, None, None).unwrap();
+        let token2 =
+            TokenGenerator::v4_public_sign(&keypair.secret_key, payload, None, None).unwrap();
 
         assert_eq!(token1, token2, "Ed25519 signatures should be deterministic");
     }
@@ -442,7 +439,8 @@ mod tests {
 
         let keypair = KeyGenerator::generate_ed25519_keypair();
         let payload = b"test payload";
-        let token = TokenGenerator::v4_public_sign(&keypair.secret_key, payload, None, None).unwrap();
+        let token =
+            TokenGenerator::v4_public_sign(&keypair.secret_key, payload, None, None).unwrap();
 
         // Token should have format: v4.public.base64url_payload
         let parts: Vec<&str> = token.split('.').collect();

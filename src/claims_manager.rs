@@ -114,10 +114,7 @@ mod tests {
         let future_nbf = ClaimsManager::now() + 3600;
         let result = ClaimsManager::validate_nbf(future_nbf, 0);
         assert!(result.is_err());
-        assert!(matches!(
-            result.unwrap_err(),
-            PasetoError::TokenNotYetValid
-        ));
+        assert!(matches!(result.unwrap_err(), PasetoError::TokenNotYetValid));
     }
 
     #[test]

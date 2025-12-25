@@ -8,7 +8,9 @@ version = "0.1.0"
 description = "High-performance PASETO tokens implemented in Rust with Python bindings"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "hypothesis>=6.148.8",
+]
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
