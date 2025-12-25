@@ -4,12 +4,16 @@ pub mod error;
 pub mod key_generator;
 pub mod pae;
 pub mod payload;
+pub mod token_generator;
+pub mod token_verifier;
 pub mod version;
 
 pub use error::PasetoError;
 pub use key_generator::{Ed25519KeyPair, KeyGenerator};
 pub use pae::Pae;
 pub use payload::TokenPayload;
+pub use token_generator::TokenGenerator;
+pub use token_verifier::TokenVerifier;
 pub use version::{Purpose, Version};
 
 /// A Python module implemented in Rust.
