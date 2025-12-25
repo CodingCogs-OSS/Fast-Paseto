@@ -1,6 +1,14 @@
 """Type stubs for fast_paseto Rust extension module."""
 
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, Protocol, Union
+
+class Serializer(Protocol):
+    """Protocol for custom serializers."""
+    def dumps(self, obj: Any) -> Union[bytes, str]: ...
+
+class Deserializer(Protocol):
+    """Protocol for custom deserializers."""
+    def loads(self, data: Union[bytes, str]) -> Any: ...
 
 class PasetoError(Exception):
     """Base exception for all PASETO errors."""
@@ -35,15 +43,15 @@ class PasetoNotYetValidError(PasetoValidationError):
 class Token:
     """Represents a decoded PASETO token."""
 
-    payload: Dict[str, Any]
-    footer: Optional[Dict[str, Any]]
+    payload: Any
+    footer: Optional[Any]
     version: str
     purpose: str
 
     def __init__(
         self,
-        payload: Dict[str, Any],
-        footer: Optional[Dict[str, Any]],
+        payload: Any,
+        footer: Optional[Any],
         version: str,
         purpose: str,
     ) -> None: ...
@@ -89,11 +97,12 @@ class Paseto:
     def encode(
         self,
         key: Union[bytes, str],
-        payload: Dict[str, Any],
+        payload: Union[Dict[str, Any], bytes, str],
         purpose: str = "local",
         version: str = "v4",
         footer: Optional[Union[bytes, str, Dict[str, Any]]] = None,
         implicit_assertion: Optional[bytes] = None,
+        serializer: Optional[Serializer] = None,
     ) -> str:
         """Encode a PASETO token with configured defaults.
 
@@ -102,11 +111,14 @@ class Paseto:
 
         Args:
             key: The cryptographic key (bytes or str)
-            payload: The payload data as a Python dict
+            payload: The payload data as a Python dict, bytes, or str
             purpose: Token purpose - "local" or "public". Default: "local"
             version: PASETO version - "v2", "v3", or "v4". Default: "v4"
             footer: Optional footer data (bytes, str, or dict). Default: None
             implicit_assertion: Optional implicit assertion (bytes). Default: None
+            serializer: Optional object with dumps() method for custom serialization.
+                        If provided, will be used to serialize dict payloads and footers.
+                        Default: None (uses JSON)
 
         Returns:
             str: The encoded PASETO token string
@@ -126,6 +138,7 @@ class Paseto:
         version: str = "v4",
         footer: Optional[Union[bytes, str, Dict[str, Any]]] = None,
         implicit_assertion: Optional[bytes] = None,
+        deserializer: Optional[Deserializer] = None,
     ) -> Token:
         """Decode a PASETO token with configured leeway.
 
@@ -139,6 +152,9 @@ class Paseto:
             version: PASETO version - "v2", "v3", or "v4". Default: "v4"
             footer: Optional expected footer data (bytes, str, or dict). Default: None
             implicit_assertion: Optional implicit assertion (bytes). Default: None
+            deserializer: Optional object with loads() method for custom deserialization.
+                          If provided, will be used to deserialize payload and footer.
+                          Default: None (uses JSON)
 
         Returns:
             Token: A Token object with payload, footer, version, and purpose
@@ -166,19 +182,25 @@ def generate_keypair() -> tuple[bytes, bytes]:
 
 def encode(
     key: Union[bytes, str],
-    payload: Dict[str, Any],
-    purpose: str,
-    footer: Optional[Dict[str, Any]] = None,
+    payload: Union[Dict[str, Any], bytes, str],
+    purpose: str = "local",
+    version: str = "v4",
+    footer: Optional[Union[bytes, str, Dict[str, Any]]] = None,
     implicit_assertion: Optional[bytes] = None,
+    serializer: Optional[Serializer] = None,
 ) -> str:
     """Encode a PASETO token.
 
     Args:
         key: Symmetric key (32 bytes) for local tokens or secret key (64 bytes) for public tokens
-        payload: Dictionary containing the token claims
+        payload: Dictionary, bytes, or string containing the token claims
         purpose: Either "local" or "public"
-        footer: Optional footer dictionary
+        version: PASETO version - "v2", "v3", or "v4". Default: "v4"
+        footer: Optional footer (dict, bytes, or str)
         implicit_assertion: Optional implicit assertion bytes
+        serializer: Optional object with dumps() method for custom serialization.
+                    If provided, will be used to serialize dict payloads and footers.
+                    Default: None (uses JSON)
 
     Returns:
         str: The encoded PASETO token
@@ -192,9 +214,12 @@ def encode(
 def decode(
     token: str,
     key: Union[bytes, str],
-    purpose: str,
-    footer: Optional[Dict[str, Any]] = None,
+    purpose: str = "local",
+    version: str = "v4",
+    footer: Optional[Union[bytes, str, Dict[str, Any]]] = None,
     implicit_assertion: Optional[bytes] = None,
+    deserializer: Optional[Deserializer] = None,
+    leeway: int = 0,
 ) -> Token:
     """Decode and verify a PASETO token.
 
@@ -202,8 +227,13 @@ def decode(
         token: The PASETO token string to decode
         key: Symmetric key (32 bytes) for local tokens or public key (32 bytes) for public tokens
         purpose: Either "local" or "public"
-        footer: Optional expected footer dictionary
+        version: PASETO version - "v2", "v3", or "v4". Default: "v4"
+        footer: Optional expected footer (dict, bytes, or str)
         implicit_assertion: Optional implicit assertion bytes
+        deserializer: Optional object with loads() method for custom deserialization.
+                      If provided, will be used to deserialize payload and footer.
+                      Default: None (uses JSON)
+        leeway: Time tolerance in seconds for time-based claims. Default: 0
 
     Returns:
         Token: The decoded token object

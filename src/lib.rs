@@ -305,11 +305,14 @@ impl Paseto {
     ///
     /// Args:
     ///     key: The cryptographic key (bytes or str)
-    ///     payload: The payload data as a Python dict
+    ///     payload: The payload data as a Python dict, bytes, or str
     ///     purpose: Token purpose - "local" or "public". Default: "local"
     ///     version: PASETO version - "v2", "v3", or "v4". Default: "v4"
     ///     footer: Optional footer data (bytes, str, or dict). Default: None
     ///     implicit_assertion: Optional implicit assertion (bytes). Default: None
+    ///     serializer: Optional object with dumps() method for custom serialization.
+    ///                 If provided, will be used to serialize dict payloads and footers.
+    ///                 Default: None (uses JSON)
     ///
     /// Returns:
     ///     str: The encoded PASETO token string
@@ -320,7 +323,10 @@ impl Paseto {
     ///     >>> payload = {"sub": "user123"}
     ///     >>> token = paseto.encode(key, payload)
     ///     >>> # Token will have exp and iat claims automatically added
-    #[pyo3(signature = (key, payload, purpose="local", version="v4", footer=None, implicit_assertion=None))]
+    ///     >>> # With custom serializer:
+    ///     >>> import json
+    ///     >>> token = paseto.encode(key, payload, serializer=json)
+    #[pyo3(signature = (key, payload, purpose="local", version="v4", footer=None, implicit_assertion=None, serializer=None))]
     fn encode(
         &self,
         py: Python<'_>,
@@ -330,6 +336,7 @@ impl Paseto {
         version: &str,
         footer: Option<&Bound<'_, PyAny>>,
         implicit_assertion: Option<&[u8]>,
+        serializer: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<String> {
         use pyo3::types::{PyBytes, PyDict, PyString};
 
@@ -348,8 +355,16 @@ impl Paseto {
             ));
         };
 
-        // Get payload as dict and apply defaults
-        let payload_dict = if let Ok(dict) = payload.cast::<PyDict>() {
+        // Get the serializer's dumps method or fall back to JSON
+        let json_module = py.import("json")?;
+        let dumps = if let Some(ser) = serializer {
+            ser.getattr("dumps")?
+        } else {
+            json_module.getattr("dumps")?
+        };
+
+        // Serialize payload based on type
+        let payload_bytes = if let Ok(dict) = payload.cast::<PyDict>() {
             // Create a copy of the dict to avoid modifying the original
             let new_dict = dict.copy()?;
 
@@ -368,19 +383,30 @@ impl Paseto {
                 new_dict.set_item("iat", now)?;
             }
 
-            new_dict
+            // Serialize using the serializer
+            let serialized = dumps.call1((new_dict,))?;
+
+            // Handle both bytes and str return types from serializer
+            if let Ok(bytes) = serialized.cast::<PyBytes>() {
+                bytes.as_bytes().to_vec()
+            } else if let Ok(string) = serialized.cast::<PyString>() {
+                string.to_str()?.as_bytes().to_vec()
+            } else {
+                return Err(pyo3::exceptions::PyTypeError::new_err(
+                    "Serializer dumps() must return bytes or str",
+                ));
+            }
+        } else if let Ok(bytes) = payload.cast::<PyBytes>() {
+            // Accept raw bytes payload when no serializer needed
+            bytes.as_bytes().to_vec()
+        } else if let Ok(string) = payload.cast::<PyString>() {
+            // Accept raw string payload when no serializer needed
+            string.to_str()?.as_bytes().to_vec()
         } else {
             return Err(pyo3::exceptions::PyTypeError::new_err(
-                "Payload must be a dict",
+                "Payload must be a dict, bytes, or str",
             ));
         };
-
-        // Serialize payload to JSON
-        let json_module = py.import("json")?;
-        let dumps = json_module.getattr("dumps")?;
-        let json_bound = dumps.call1((payload_dict,))?;
-        let json_str = json_bound.cast::<PyString>()?;
-        let payload_json = json_str.to_str()?.as_bytes().to_vec();
 
         // Convert footer to bytes if provided
         let footer_bytes = if let Some(f) = footer {
@@ -389,10 +415,17 @@ impl Paseto {
             } else if let Ok(string) = f.cast::<PyString>() {
                 Some(string.to_str()?.as_bytes().to_vec())
             } else if let Ok(dict) = f.cast::<PyDict>() {
-                // Convert dict to JSON string
-                let json_bound = dumps.call1((dict,))?;
-                let json_str = json_bound.cast::<PyString>()?;
-                Some(json_str.to_str()?.as_bytes().to_vec())
+                // Serialize dict footer using the serializer
+                let serialized = dumps.call1((dict,))?;
+                if let Ok(bytes) = serialized.cast::<PyBytes>() {
+                    Some(bytes.as_bytes().to_vec())
+                } else if let Ok(string) = serialized.cast::<PyString>() {
+                    Some(string.to_str()?.as_bytes().to_vec())
+                } else {
+                    return Err(pyo3::exceptions::PyTypeError::new_err(
+                        "Serializer dumps() must return bytes or str",
+                    ));
+                }
             } else {
                 return Err(pyo3::exceptions::PyTypeError::new_err(
                     "Footer must be bytes, str, or dict",
@@ -417,7 +450,7 @@ impl Paseto {
                     .map_err(|_| PasetoKeyError::new_err("Failed to convert key to array"))?;
                 TokenGenerator::v4_local_encrypt(
                     &key_array,
-                    &payload_json,
+                    &payload_bytes,
                     footer_bytes.as_deref(),
                     implicit_assertion,
                 )?
@@ -435,7 +468,7 @@ impl Paseto {
                     .map_err(|_| PasetoKeyError::new_err("Failed to convert key to array"))?;
                 TokenGenerator::v4_public_sign(
                     &key_array,
-                    &payload_json,
+                    &payload_bytes,
                     footer_bytes.as_deref(),
                     implicit_assertion,
                 )?
@@ -463,6 +496,9 @@ impl Paseto {
     ///     version: PASETO version - "v2", "v3", or "v4". Default: "v4"
     ///     footer: Optional expected footer data (bytes, str, or dict). Default: None
     ///     implicit_assertion: Optional implicit assertion (bytes). Default: None
+    ///     deserializer: Optional object with loads() method for custom deserialization.
+    ///                   If provided, will be used to deserialize payload and footer.
+    ///                   Default: None (uses JSON)
     ///
     /// Returns:
     ///     Token: A Token object with payload, footer, version, and purpose
@@ -473,7 +509,10 @@ impl Paseto {
     ///     >>> key = b"..."
     ///     >>> decoded = paseto.decode(token_str, key)
     ///     >>> # Time-based claims will be validated with 60 second tolerance
-    #[pyo3(signature = (token, key, purpose="local", version="v4", footer=None, implicit_assertion=None))]
+    ///     >>> # With custom deserializer:
+    ///     >>> import json
+    ///     >>> decoded = paseto.decode(token_str, key, deserializer=json)
+    #[pyo3(signature = (token, key, purpose="local", version="v4", footer=None, implicit_assertion=None, deserializer=None))]
     fn decode(
         &self,
         py: Python<'_>,
@@ -483,6 +522,7 @@ impl Paseto {
         version: &str,
         footer: Option<&Bound<'_, PyAny>>,
         implicit_assertion: Option<&[u8]>,
+        deserializer: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Token> {
         use pyo3::types::{PyBytes, PyDict, PyString};
         use base64::prelude::*;
@@ -502,19 +542,43 @@ impl Paseto {
             ));
         };
 
-        // Convert footer to bytes if provided
+        // Get the deserializer's loads method or fall back to JSON
+        let json_module = py.import("json")?;
+        let loads = if let Some(deser) = deserializer {
+            deser.getattr("loads")?
+        } else {
+            json_module.getattr("loads")?
+        };
+
+        // Get the serializer's dumps method for footer comparison (use JSON for footer serialization)
+        let dumps = if let Some(deser) = deserializer {
+            // Try to get dumps from the deserializer (it might be a module like json)
+            match deser.getattr("dumps") {
+                Ok(d) => d,
+                Err(_) => json_module.getattr("dumps")?,
+            }
+        } else {
+            json_module.getattr("dumps")?
+        };
+
+        // Convert footer to bytes if provided (for comparison)
         let footer_bytes = if let Some(f) = footer {
             if let Ok(bytes) = f.cast::<PyBytes>() {
                 Some(bytes.as_bytes().to_vec())
             } else if let Ok(string) = f.cast::<PyString>() {
                 Some(string.to_str()?.as_bytes().to_vec())
             } else if let Ok(dict) = f.cast::<PyDict>() {
-                // Convert dict to JSON string
-                let json_module = py.import("json")?;
-                let dumps = json_module.getattr("dumps")?;
-                let json_bound = dumps.call1((dict,))?;
-                let json_str = json_bound.cast::<PyString>()?;
-                Some(json_str.to_str()?.as_bytes().to_vec())
+                // Serialize dict footer using the serializer
+                let serialized = dumps.call1((dict,))?;
+                if let Ok(bytes) = serialized.cast::<PyBytes>() {
+                    Some(bytes.as_bytes().to_vec())
+                } else if let Ok(string) = serialized.cast::<PyString>() {
+                    Some(string.to_str()?.as_bytes().to_vec())
+                } else {
+                    return Err(pyo3::exceptions::PyTypeError::new_err(
+                        "Serializer dumps() must return bytes or str",
+                    ));
+                }
             } else {
                 return Err(pyo3::exceptions::PyTypeError::new_err(
                     "Footer must be bytes, str, or dict",
@@ -573,23 +637,54 @@ impl Paseto {
             }
         };
 
-        // Parse payload JSON to Python dict
-        let json_module = py.import("json")?;
-        let loads = json_module.getattr("loads")?;
-        let payload_str = std::str::from_utf8(&payload_bytes)
-            .map_err(|e| PasetoValidationError::new_err(format!("Invalid UTF-8 in payload: {}", e)))?;
-        let payload_dict = loads.call1((payload_str,))?;
+        // Deserialize payload using the deserializer
+        // First convert bytes to appropriate input for loads
+        let payload_input = if deserializer.is_some() {
+            // Custom deserializer might expect bytes
+            PyBytes::new(py, &payload_bytes).into_any()
+        } else {
+            // JSON loads expects str
+            let payload_str = std::str::from_utf8(&payload_bytes)
+                .map_err(|e| PasetoValidationError::new_err(format!("Invalid UTF-8 in payload: {}", e)))?;
+            PyString::new(py, payload_str).into_any()
+        };
 
-        // Parse footer JSON to Python dict if present
-        let footer_dict = if let Some(footer_data) = token_footer_bytes {
-            let footer_str = std::str::from_utf8(&footer_data)
-                .map_err(|e| PasetoValidationError::new_err(format!("Invalid UTF-8 in footer: {}", e)))?;
-            // Try to parse as JSON, if it fails, just return as string
-            match loads.call1((footer_str,)) {
+        let payload_obj = match loads.call1((payload_input,)) {
+            Ok(obj) => obj,
+            Err(_) => {
+                // If bytes didn't work, try with string
+                let payload_str = std::str::from_utf8(&payload_bytes)
+                    .map_err(|e| PasetoValidationError::new_err(format!("Invalid UTF-8 in payload: {}", e)))?;
+                loads.call1((payload_str,))?
+            }
+        };
+
+        // Deserialize footer if present
+        let footer_obj = if let Some(footer_data) = token_footer_bytes {
+            // Try to deserialize using the deserializer
+            let footer_input = if deserializer.is_some() {
+                // Custom deserializer might expect bytes
+                PyBytes::new(py, &footer_data).into_any()
+            } else {
+                // JSON loads expects str
+                let footer_str = std::str::from_utf8(&footer_data)
+                    .map_err(|e| PasetoValidationError::new_err(format!("Invalid UTF-8 in footer: {}", e)))?;
+                PyString::new(py, footer_str).into_any()
+            };
+
+            match loads.call1((footer_input,)) {
                 Ok(obj) => Some(obj.unbind()),
                 Err(_) => {
-                    // If JSON parsing fails, return as string
-                    Some(PyString::new(py, footer_str).into())
+                    // If bytes didn't work, try with string
+                    let footer_str = std::str::from_utf8(&footer_data)
+                        .map_err(|e| PasetoValidationError::new_err(format!("Invalid UTF-8 in footer: {}", e)))?;
+                    match loads.call1((footer_str,)) {
+                        Ok(obj) => Some(obj.unbind()),
+                        Err(_) => {
+                            // If deserialization fails, return as string
+                            Some(PyString::new(py, footer_str).into())
+                        }
+                    }
                 }
             }
         } else {
@@ -598,8 +693,8 @@ impl Paseto {
 
         // Create Token object
         Ok(Token {
-            payload: payload_dict.unbind(),
-            footer: footer_dict,
+            payload: payload_obj.unbind(),
+            footer: footer_obj,
             version: version.to_string(),
             purpose: purpose.to_string(),
         })
@@ -695,12 +790,15 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
     /// Args:
     ///     key: The cryptographic key (bytes or str). For local tokens, must be
     ///          32 bytes. For public tokens, must be 64 bytes (Ed25519 secret key).
-    ///     payload: The payload data as a Python dict
+    ///     payload: The payload data as a Python dict, bytes, or str
     ///     purpose: Token purpose - "local" (symmetric) or "public" (asymmetric).
     ///              Default: "local"
     ///     version: PASETO version - "v2", "v3", or "v4". Default: "v4"
     ///     footer: Optional footer data (bytes, str, or dict). Default: None
     ///     implicit_assertion: Optional implicit assertion (bytes). Default: None
+    ///     serializer: Optional object with dumps() method for custom serialization.
+    ///                 If provided, will be used to serialize dict payloads and footers.
+    ///                 Default: None (uses JSON)
     ///
     /// Returns:
     ///     str: The encoded PASETO token string
@@ -717,8 +815,11 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
     ///     >>> token = fast_paseto.encode(key, payload, purpose="local")
     ///     >>> token.startswith("v4.local.")
     ///     True
+    ///     >>> # With custom serializer:
+    ///     >>> import json
+    ///     >>> token = fast_paseto.encode(key, payload, serializer=json)
     #[pyfunction]
-    #[pyo3(signature = (key, payload, purpose="local", version="v4", footer=None, implicit_assertion=None))]
+    #[pyo3(signature = (key, payload, purpose="local", version="v4", footer=None, implicit_assertion=None, serializer=None))]
     fn encode(
         py: Python<'_>,
         key: &Bound<'_, PyAny>,
@@ -727,6 +828,7 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
         version: &str,
         footer: Option<&Bound<'_, PyAny>>,
         implicit_assertion: Option<&[u8]>,
+        serializer: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<String> {
         use pyo3::types::{PyBytes, PyDict, PyString};
 
@@ -745,17 +847,38 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
             ));
         };
 
-        // Serialize payload to JSON
-        let payload_json = if let Ok(dict) = payload.cast::<PyDict>() {
-            // Convert dict to JSON string
-            let json_module = py.import("json")?;
-            let dumps = json_module.getattr("dumps")?;
-            let json_bound = dumps.call1((dict,))?;
-            let json_str = json_bound.cast::<PyString>()?;
-            json_str.to_str()?.as_bytes().to_vec()
+        // Get the serializer's dumps method or fall back to JSON
+        let json_module = py.import("json")?;
+        let dumps = if let Some(ser) = serializer {
+            ser.getattr("dumps")?
+        } else {
+            json_module.getattr("dumps")?
+        };
+
+        // Serialize payload based on type
+        let payload_bytes = if let Ok(dict) = payload.cast::<PyDict>() {
+            // Serialize using the serializer
+            let serialized = dumps.call1((dict,))?;
+
+            // Handle both bytes and str return types from serializer
+            if let Ok(bytes) = serialized.cast::<PyBytes>() {
+                bytes.as_bytes().to_vec()
+            } else if let Ok(string) = serialized.cast::<PyString>() {
+                string.to_str()?.as_bytes().to_vec()
+            } else {
+                return Err(pyo3::exceptions::PyTypeError::new_err(
+                    "Serializer dumps() must return bytes or str",
+                ));
+            }
+        } else if let Ok(bytes) = payload.cast::<PyBytes>() {
+            // Accept raw bytes payload when no serializer needed
+            bytes.as_bytes().to_vec()
+        } else if let Ok(string) = payload.cast::<PyString>() {
+            // Accept raw string payload when no serializer needed
+            string.to_str()?.as_bytes().to_vec()
         } else {
             return Err(pyo3::exceptions::PyTypeError::new_err(
-                "Payload must be a dict",
+                "Payload must be a dict, bytes, or str",
             ));
         };
 
@@ -766,12 +889,17 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
             } else if let Ok(string) = f.cast::<PyString>() {
                 Some(string.to_str()?.as_bytes().to_vec())
             } else if let Ok(dict) = f.cast::<PyDict>() {
-                // Convert dict to JSON string
-                let json_module = py.import("json")?;
-                let dumps = json_module.getattr("dumps")?;
-                let json_bound = dumps.call1((dict,))?;
-                let json_str = json_bound.cast::<PyString>()?;
-                Some(json_str.to_str()?.as_bytes().to_vec())
+                // Serialize dict footer using the serializer
+                let serialized = dumps.call1((dict,))?;
+                if let Ok(bytes) = serialized.cast::<PyBytes>() {
+                    Some(bytes.as_bytes().to_vec())
+                } else if let Ok(string) = serialized.cast::<PyString>() {
+                    Some(string.to_str()?.as_bytes().to_vec())
+                } else {
+                    return Err(pyo3::exceptions::PyTypeError::new_err(
+                        "Serializer dumps() must return bytes or str",
+                    ));
+                }
             } else {
                 return Err(pyo3::exceptions::PyTypeError::new_err(
                     "Footer must be bytes, str, or dict",
@@ -796,7 +924,7 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
                     .map_err(|_| PasetoKeyError::new_err("Failed to convert key to array"))?;
                 TokenGenerator::v4_local_encrypt(
                     &key_array,
-                    &payload_json,
+                    &payload_bytes,
                     footer_bytes.as_deref(),
                     implicit_assertion,
                 )?
@@ -814,7 +942,7 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
                     .map_err(|_| PasetoKeyError::new_err("Failed to convert key to array"))?;
                 TokenGenerator::v4_public_sign(
                     &key_array,
-                    &payload_json,
+                    &payload_bytes,
                     footer_bytes.as_deref(),
                     implicit_assertion,
                 )?
@@ -844,6 +972,9 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
     ///     version: PASETO version - "v2", "v3", or "v4". Default: "v4"
     ///     footer: Optional expected footer data (bytes, str, or dict). Default: None
     ///     implicit_assertion: Optional implicit assertion (bytes). Default: None
+    ///     deserializer: Optional object with loads() method for custom deserialization.
+    ///                   If provided, will be used to deserialize payload and footer.
+    ///                   Default: None (uses JSON)
     ///     leeway: Time tolerance in seconds for time-based claims. Default: 0
     ///
     /// Returns:
@@ -866,8 +997,11 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
     ///     'user123'
     ///     >>> token.version
     ///     'v4'
+    ///     >>> # With custom deserializer:
+    ///     >>> import json
+    ///     >>> token = fast_paseto.decode(token_str, key, deserializer=json)
     #[pyfunction]
-    #[pyo3(signature = (token, key, purpose="local", version="v4", footer=None, implicit_assertion=None, leeway=0))]
+    #[pyo3(signature = (token, key, purpose="local", version="v4", footer=None, implicit_assertion=None, deserializer=None, leeway=0))]
     fn decode(
         py: Python<'_>,
         token: &str,
@@ -876,6 +1010,7 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
         version: &str,
         footer: Option<&Bound<'_, PyAny>>,
         implicit_assertion: Option<&[u8]>,
+        deserializer: Option<&Bound<'_, PyAny>>,
         leeway: u64,
     ) -> PyResult<Token> {
         use pyo3::types::{PyBytes, PyDict, PyString};
@@ -896,6 +1031,25 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
             ));
         };
 
+        // Get the deserializer's loads method or fall back to JSON
+        let json_module = py.import("json")?;
+        let loads = if let Some(deser) = deserializer {
+            deser.getattr("loads")?
+        } else {
+            json_module.getattr("loads")?
+        };
+
+        // Get the serializer's dumps method for footer comparison
+        let dumps = if let Some(deser) = deserializer {
+            // Try to get dumps from the deserializer (it might be a module like json)
+            match deser.getattr("dumps") {
+                Ok(d) => d,
+                Err(_) => json_module.getattr("dumps")?,
+            }
+        } else {
+            json_module.getattr("dumps")?
+        };
+
         // Convert footer to bytes if provided
         let footer_bytes = if let Some(f) = footer {
             if let Ok(bytes) = f.cast::<PyBytes>() {
@@ -903,12 +1057,17 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
             } else if let Ok(string) = f.cast::<PyString>() {
                 Some(string.to_str()?.as_bytes().to_vec())
             } else if let Ok(dict) = f.cast::<PyDict>() {
-                // Convert dict to JSON string
-                let json_module = py.import("json")?;
-                let dumps = json_module.getattr("dumps")?;
-                let json_bound = dumps.call1((dict,))?;
-                let json_str = json_bound.cast::<PyString>()?;
-                Some(json_str.to_str()?.as_bytes().to_vec())
+                // Serialize dict footer using the serializer
+                let serialized = dumps.call1((dict,))?;
+                if let Ok(bytes) = serialized.cast::<PyBytes>() {
+                    Some(bytes.as_bytes().to_vec())
+                } else if let Ok(string) = serialized.cast::<PyString>() {
+                    Some(string.to_str()?.as_bytes().to_vec())
+                } else {
+                    return Err(pyo3::exceptions::PyTypeError::new_err(
+                        "Serializer dumps() must return bytes or str",
+                    ));
+                }
             } else {
                 return Err(pyo3::exceptions::PyTypeError::new_err(
                     "Footer must be bytes, str, or dict",
@@ -967,23 +1126,54 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
             }
         };
 
-        // Parse payload JSON to Python dict
-        let json_module = py.import("json")?;
-        let loads = json_module.getattr("loads")?;
-        let payload_str = std::str::from_utf8(&payload_bytes)
-            .map_err(|e| PasetoValidationError::new_err(format!("Invalid UTF-8 in payload: {}", e)))?;
-        let payload_dict = loads.call1((payload_str,))?;
+        // Deserialize payload using the deserializer
+        // First convert bytes to appropriate input for loads
+        let payload_input = if deserializer.is_some() {
+            // Custom deserializer might expect bytes
+            PyBytes::new(py, &payload_bytes).into_any()
+        } else {
+            // JSON loads expects str
+            let payload_str = std::str::from_utf8(&payload_bytes)
+                .map_err(|e| PasetoValidationError::new_err(format!("Invalid UTF-8 in payload: {}", e)))?;
+            PyString::new(py, payload_str).into_any()
+        };
 
-        // Parse footer JSON to Python dict if present
-        let footer_dict = if let Some(footer_data) = token_footer_bytes {
-            let footer_str = std::str::from_utf8(&footer_data)
-                .map_err(|e| PasetoValidationError::new_err(format!("Invalid UTF-8 in footer: {}", e)))?;
-            // Try to parse as JSON, if it fails, just return as string
-            match loads.call1((footer_str,)) {
+        let payload_obj = match loads.call1((payload_input,)) {
+            Ok(obj) => obj,
+            Err(_) => {
+                // If bytes didn't work, try with string
+                let payload_str = std::str::from_utf8(&payload_bytes)
+                    .map_err(|e| PasetoValidationError::new_err(format!("Invalid UTF-8 in payload: {}", e)))?;
+                loads.call1((payload_str,))?
+            }
+        };
+
+        // Deserialize footer if present
+        let footer_obj = if let Some(footer_data) = token_footer_bytes {
+            // Try to deserialize using the deserializer
+            let footer_input = if deserializer.is_some() {
+                // Custom deserializer might expect bytes
+                PyBytes::new(py, &footer_data).into_any()
+            } else {
+                // JSON loads expects str
+                let footer_str = std::str::from_utf8(&footer_data)
+                    .map_err(|e| PasetoValidationError::new_err(format!("Invalid UTF-8 in footer: {}", e)))?;
+                PyString::new(py, footer_str).into_any()
+            };
+
+            match loads.call1((footer_input,)) {
                 Ok(obj) => Some(obj.unbind()),
                 Err(_) => {
-                    // If JSON parsing fails, return as string
-                    Some(PyString::new(py, footer_str).into())
+                    // If bytes didn't work, try with string
+                    let footer_str = std::str::from_utf8(&footer_data)
+                        .map_err(|e| PasetoValidationError::new_err(format!("Invalid UTF-8 in footer: {}", e)))?;
+                    match loads.call1((footer_str,)) {
+                        Ok(obj) => Some(obj.unbind()),
+                        Err(_) => {
+                            // If deserialization fails, return as string
+                            Some(PyString::new(py, footer_str).into())
+                        }
+                    }
                 }
             }
         } else {
@@ -992,8 +1182,8 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
         // Create Token object
         Ok(Token {
-            payload: payload_dict.unbind(),
-            footer: footer_dict,
+            payload: payload_obj.unbind(),
+            footer: footer_obj,
             version: version.to_string(),
             purpose: purpose.to_string(),
         })
