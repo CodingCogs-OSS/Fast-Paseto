@@ -856,8 +856,8 @@ impl KeyManager {
     /// let secret_key = KeyManager::ed25519_from_pem(pem);
     /// ```
     pub fn ed25519_from_pem(pem: &str) -> Result<[u8; 64], PasetoError> {
-        use ed25519_dalek::pkcs8::DecodePrivateKey;
         use ed25519_dalek::SigningKey;
+        use ed25519_dalek::pkcs8::DecodePrivateKey;
 
         let signing_key = SigningKey::from_pkcs8_pem(pem).map_err(|e| {
             PasetoError::InvalidPemFormat(format!("Failed to parse Ed25519 private key PEM: {}", e))
@@ -904,8 +904,8 @@ impl KeyManager {
     /// let public_key = KeyManager::ed25519_public_from_pem(pem);
     /// ```
     pub fn ed25519_public_from_pem(pem: &str) -> Result<[u8; 32], PasetoError> {
-        use ed25519_dalek::pkcs8::DecodePublicKey;
         use ed25519_dalek::VerifyingKey;
+        use ed25519_dalek::pkcs8::DecodePublicKey;
 
         let verifying_key = VerifyingKey::from_public_key_pem(pem).map_err(|e| {
             PasetoError::InvalidPemFormat(format!("Failed to parse Ed25519 public key PEM: {}", e))
@@ -913,6 +913,102 @@ impl KeyManager {
 
         let mut public_key = [0u8; 32];
         public_key.copy_from_slice(verifying_key.as_bytes());
+
+        Ok(public_key)
+    }
+
+    /// Load a P-384 private key from PEM format (PKCS#8)
+    ///
+    /// Parses a PEM-encoded P-384 private key in PKCS#8 format and returns
+    /// the 48-byte secret key suitable for use with v3.public tokens.
+    ///
+    /// # Arguments
+    ///
+    /// * `pem` - PEM-encoded P-384 private key string
+    ///
+    /// # Returns
+    ///
+    /// A 48-byte P-384 secret key
+    ///
+    /// # Errors
+    ///
+    /// Returns `PasetoError::InvalidPemFormat` if:
+    /// - The PEM format is invalid
+    /// - The key is not a P-384 key
+    /// - The key data is malformed
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use fast_paseto::KeyManager;
+    ///
+    /// let pem = r#"-----BEGIN PRIVATE KEY-----
+    /// MIG2AgEAMBAGByqGSM49AgEGBSuBBAAiBIGeMIGbAgEBBD...
+    /// -----END PRIVATE KEY-----"#;
+    ///
+    /// let secret_key = KeyManager::p384_from_pem(pem);
+    /// ```
+    pub fn p384_from_pem(pem: &str) -> Result<[u8; 48], PasetoError> {
+        use p384::ecdsa::SigningKey;
+        use p384::pkcs8::DecodePrivateKey;
+
+        let signing_key = SigningKey::from_pkcs8_pem(pem).map_err(|e| {
+            PasetoError::InvalidPemFormat(format!("Failed to parse P-384 private key PEM: {}", e))
+        })?;
+
+        // Get the secret key bytes (48 bytes for P-384)
+        let mut secret_key = [0u8; 48];
+        secret_key.copy_from_slice(&signing_key.to_bytes());
+
+        Ok(secret_key)
+    }
+
+    /// Load a P-384 public key from PEM format (SPKI)
+    ///
+    /// Parses a PEM-encoded P-384 public key in SPKI (Subject Public Key Info)
+    /// format and returns the 49-byte compressed public key suitable for use
+    /// with v3.public token verification.
+    ///
+    /// # Arguments
+    ///
+    /// * `pem` - PEM-encoded P-384 public key string
+    ///
+    /// # Returns
+    ///
+    /// A 49-byte P-384 public key (compressed point format)
+    ///
+    /// # Errors
+    ///
+    /// Returns `PasetoError::InvalidPemFormat` if:
+    /// - The PEM format is invalid
+    /// - The key is not a P-384 key
+    /// - The key data is malformed
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use fast_paseto::KeyManager;
+    ///
+    /// let pem = r#"-----BEGIN PUBLIC KEY-----
+    /// MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAE...
+    /// -----END PUBLIC KEY-----"#;
+    ///
+    /// let public_key = KeyManager::p384_public_from_pem(pem);
+    /// ```
+    pub fn p384_public_from_pem(pem: &str) -> Result<[u8; 49], PasetoError> {
+        use p384::ecdsa::VerifyingKey;
+        use p384::pkcs8::DecodePublicKey;
+
+        let verifying_key = VerifyingKey::from_public_key_pem(pem).map_err(|e| {
+            PasetoError::InvalidPemFormat(format!("Failed to parse P-384 public key PEM: {}", e))
+        })?;
+
+        // Get the public key in compressed form (49 bytes)
+        let encoded_point = verifying_key.to_encoded_point(true); // compressed
+        let public_bytes = encoded_point.as_bytes();
+
+        let mut public_key = [0u8; 49];
+        public_key.copy_from_slice(public_bytes);
 
         Ok(public_key)
     }
@@ -1869,5 +1965,78 @@ mod tests {
 
         assert_eq!(decrypted1, decrypted2);
         assert_eq!(decrypted1, keypair.secret_key);
+    }
+
+    // P-384 PEM tests
+
+    #[test]
+    fn test_p384_pem_roundtrip() {
+        use p384::ecdsa::SigningKey;
+        use p384::pkcs8::EncodePrivateKey;
+
+        // Generate a P-384 key pair
+        let keypair = KeyGenerator::generate_p384_keypair();
+
+        // Create a signing key from the secret bytes
+        let signing_key =
+            SigningKey::from_bytes((&keypair.secret_key).into()).expect("Valid secret key");
+
+        // Export to PEM
+        let pem = signing_key
+            .to_pkcs8_pem(p384::pkcs8::LineEnding::LF)
+            .expect("PEM encoding should succeed");
+
+        // Load back from PEM
+        let loaded_secret =
+            KeyManager::p384_from_pem(pem.as_str()).expect("PEM loading should succeed");
+
+        assert_eq!(keypair.secret_key, loaded_secret);
+    }
+
+    #[test]
+    fn test_p384_public_pem_roundtrip() {
+        use p384::ecdsa::SigningKey;
+        use p384::pkcs8::EncodePublicKey;
+
+        // Generate a P-384 key pair
+        let keypair = KeyGenerator::generate_p384_keypair();
+
+        // Create a signing key from the secret bytes
+        let signing_key =
+            SigningKey::from_bytes((&keypair.secret_key).into()).expect("Valid secret key");
+        let verifying_key = signing_key.verifying_key();
+
+        // Export public key to PEM
+        let pem = verifying_key
+            .to_public_key_pem(p384::pkcs8::LineEnding::LF)
+            .expect("PEM encoding should succeed");
+
+        // Load back from PEM
+        let loaded_public =
+            KeyManager::p384_public_from_pem(&pem).expect("PEM loading should succeed");
+
+        assert_eq!(keypair.public_key, loaded_public);
+    }
+
+    #[test]
+    fn test_p384_from_pem_invalid() {
+        let invalid_pem = "not a valid PEM";
+        let result = KeyManager::p384_from_pem(invalid_pem);
+        assert!(result.is_err());
+        match result {
+            Err(PasetoError::InvalidPemFormat(_)) => {}
+            _ => panic!("Expected InvalidPemFormat error"),
+        }
+    }
+
+    #[test]
+    fn test_p384_public_from_pem_invalid() {
+        let invalid_pem = "not a valid PEM";
+        let result = KeyManager::p384_public_from_pem(invalid_pem);
+        assert!(result.is_err());
+        match result {
+            Err(PasetoError::InvalidPemFormat(_)) => {}
+            _ => panic!("Expected InvalidPemFormat error"),
+        }
     }
 }

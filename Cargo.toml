@@ -17,6 +17,16 @@ ed25519-dalek = { version = "2.1", features = ["rand_core", "pkcs8", "pem"] }
 rand = "0.8"
 subtle = "2.5"  # Constant-time comparisons
 
+# P-384 ECDSA for v3.public tokens (NIST-compliant)
+p384 = { version = "0.13", features = ["ecdsa", "pem", "pkcs8"] }
+sha2 = "0.10"  # SHA-384 for v3 tokens
+
+# AES for v3.local tokens
+aes = "0.8"
+ctr = "0.9"
+hmac = "0.12"
+hkdf = "0.12"
+
 # Serialization
 base64 = "0.22"
 serde = { version = "1.0", features = ["derive"] }

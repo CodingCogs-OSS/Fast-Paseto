@@ -13,7 +13,7 @@ pub mod version;
 
 pub use claims_manager::ClaimsManager;
 pub use error::PasetoError;
-pub use key_generator::{Ed25519KeyPair, KeyGenerator};
+pub use key_generator::{Ed25519KeyPair, KeyGenerator, P384KeyPair};
 pub use key_manager::{KeyManager, PaserkId, PaserkKey};
 pub use pae::Pae;
 pub use payload::TokenPayload;
@@ -1603,7 +1603,10 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
         let wrapping_key_array: [u8; 32] = wrapping_key
             .try_into()
             .map_err(|_| PasetoKeyError::new_err("Failed to convert wrapping key to array"))?;
-        Ok(KeyManager::secret_wrap(&secret_key_array, &wrapping_key_array)?)
+        Ok(KeyManager::secret_wrap(
+            &secret_key_array,
+            &wrapping_key_array,
+        )?)
     }
 
     /// Unwrap an Ed25519 secret key with a wrapping key (PASERK secret-wrap).
