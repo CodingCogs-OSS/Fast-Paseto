@@ -1,4 +1,6 @@
 use crate::error::PasetoError;
+use crate::token_generator::TokenGenerator;
+use crate::token_verifier::TokenVerifier;
 use base64::prelude::*;
 use blake2::{Blake2b512, Digest};
 
@@ -17,6 +19,309 @@ pub enum PaserkKey {
 pub struct KeyManager;
 
 impl KeyManager {
+    /// Wrap a symmetric key using a wrapping key (PASERK local-wrap)
+    ///
+    /// Encrypts a 32-byte symmetric key using another 32-byte wrapping key,
+    /// producing a PASERK wrapped key string. Uses v4.local token encryption
+    /// internally to provide authenticated encryption.
+    ///
+    /// Format: `k4.local-wrap.pie.{base64url_wrapped_token}`
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - 32-byte symmetric key to wrap
+    /// * `wrapping_key` - 32-byte wrapping key
+    ///
+    /// # Returns
+    ///
+    /// A PASERK local-wrap key string
+    ///
+    /// # Errors
+    ///
+    /// Returns `PasetoError::CryptoError` if encryption fails
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use fast_paseto::KeyManager;
+    /// use fast_paseto::KeyGenerator;
+    ///
+    /// let key = KeyGenerator::generate_symmetric_key();
+    /// let wrapping_key = KeyGenerator::generate_symmetric_key();
+    /// let wrapped = KeyManager::local_wrap(&key, &wrapping_key).unwrap();
+    /// assert!(wrapped.starts_with("k4.local-wrap.pie."));
+    /// ```
+    pub fn local_wrap(key: &[u8; 32], wrapping_key: &[u8; 32]) -> Result<String, PasetoError> {
+        use crate::token_generator::TokenGenerator;
+
+        // Use v4.local encryption to wrap the key
+        // The key bytes become the payload
+        let wrapped_token = TokenGenerator::v4_local_encrypt(
+            wrapping_key,
+            key,
+            None, // No footer
+            None, // No implicit assertion
+        )?;
+
+        // Extract the payload part (everything after "v4.local.")
+        // Format: v4.local.{base64url_payload}
+        let parts: Vec<&str> = wrapped_token.split('.').collect();
+        if parts.len() < 3 {
+            return Err(PasetoError::CryptoError(
+                "Invalid wrapped token format".to_string(),
+            ));
+        }
+
+        // Build PASERK local-wrap format: k4.local-wrap.pie.{base64url_payload}
+        Ok(format!("k4.local-wrap.pie.{}", parts[2]))
+    }
+
+    /// Unwrap a symmetric key using a wrapping key (PASERK local-wrap)
+    ///
+    /// Decrypts a PASERK wrapped key string using a 32-byte wrapping key,
+    /// returning the original 32-byte symmetric key. Uses v4.local token
+    /// decryption internally to provide authenticated decryption.
+    ///
+    /// Format: `k4.local-wrap.pie.{base64url_wrapped_token}`
+    ///
+    /// # Arguments
+    ///
+    /// * `wrapped_key` - PASERK local-wrap key string
+    /// * `wrapping_key` - 32-byte wrapping key
+    ///
+    /// # Returns
+    ///
+    /// The unwrapped 32-byte symmetric key
+    ///
+    /// # Errors
+    ///
+    /// Returns `PasetoError::InvalidPaserkFormat` if the format is invalid
+    /// Returns `PasetoError::AuthenticationFailed` if decryption fails
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use fast_paseto::KeyManager;
+    /// use fast_paseto::KeyGenerator;
+    ///
+    /// let key = KeyGenerator::generate_symmetric_key();
+    /// let wrapping_key = KeyGenerator::generate_symmetric_key();
+    /// let wrapped = KeyManager::local_wrap(&key, &wrapping_key).unwrap();
+    /// let unwrapped = KeyManager::local_unwrap(&wrapped, &wrapping_key).unwrap();
+    /// assert_eq!(key, unwrapped);
+    /// ```
+    pub fn local_unwrap(
+        wrapped_key: &str,
+        wrapping_key: &[u8; 32],
+    ) -> Result<[u8; 32], PasetoError> {
+        use crate::token_verifier::TokenVerifier;
+
+        // Parse PASERK local-wrap format: k4.local-wrap.pie.{base64url_payload}
+        let parts: Vec<&str> = wrapped_key.split('.').collect();
+
+        if parts.len() != 4 {
+            return Err(PasetoError::InvalidPaserkFormat(
+                "PASERK local-wrap must have exactly 4 parts separated by dots".to_string(),
+            ));
+        }
+
+        if parts[0] != "k4" {
+            return Err(PasetoError::InvalidPaserkFormat(format!(
+                "Unsupported PASERK version: {}",
+                parts[0]
+            )));
+        }
+
+        if parts[1] != "local-wrap" {
+            return Err(PasetoError::InvalidPaserkFormat(format!(
+                "Expected 'local-wrap', got '{}'",
+                parts[1]
+            )));
+        }
+
+        if parts[2] != "pie" {
+            return Err(PasetoError::InvalidPaserkFormat(format!(
+                "Expected 'pie', got '{}'",
+                parts[2]
+            )));
+        }
+
+        // Reconstruct v4.local token from the payload part
+        let token = format!("v4.local.{}", parts[3]);
+
+        // Use v4.local decryption to unwrap the key
+        let verifier = TokenVerifier::new(None);
+        let key_bytes = verifier.v4_local_decrypt(
+            &token,
+            wrapping_key,
+            None, // No footer
+            None, // No implicit assertion
+        )?;
+
+        // Validate key length
+        if key_bytes.len() != 32 {
+            return Err(PasetoError::InvalidPaserkFormat(format!(
+                "Unwrapped key must be 32 bytes, got {}",
+                key_bytes.len()
+            )));
+        }
+
+        let mut key = [0u8; 32];
+        key.copy_from_slice(&key_bytes);
+        Ok(key)
+    }
+
+    /// Wrap an Ed25519 secret key using a wrapping key (PASERK secret-wrap)
+    ///
+    /// Encrypts a 64-byte Ed25519 secret key using a 32-byte wrapping key,
+    /// producing a PASERK wrapped key string. Uses v4.local token encryption
+    /// internally to provide authenticated encryption.
+    ///
+    /// Format: `k4.secret-wrap.pie.{base64url_wrapped_token}`
+    ///
+    /// # Arguments
+    ///
+    /// * `secret_key` - 64-byte Ed25519 secret key to wrap
+    /// * `wrapping_key` - 32-byte wrapping key
+    ///
+    /// # Returns
+    ///
+    /// A PASERK secret-wrap key string
+    ///
+    /// # Errors
+    ///
+    /// Returns `PasetoError::CryptoError` if encryption fails
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use fast_paseto::KeyManager;
+    /// use fast_paseto::KeyGenerator;
+    ///
+    /// let keypair = KeyGenerator::generate_ed25519_keypair();
+    /// let wrapping_key = KeyGenerator::generate_symmetric_key();
+    /// let wrapped = KeyManager::secret_wrap(&keypair.secret_key, &wrapping_key).unwrap();
+    /// assert!(wrapped.starts_with("k4.secret-wrap.pie."));
+    /// ```
+    pub fn secret_wrap(
+        secret_key: &[u8; 64],
+        wrapping_key: &[u8; 32],
+    ) -> Result<String, PasetoError> {
+        // Use v4.local encryption to wrap the secret key
+        // The secret key bytes become the payload
+        let wrapped_token = TokenGenerator::v4_local_encrypt(
+            wrapping_key,
+            secret_key,
+            None, // No footer
+            None, // No implicit assertion
+        )?;
+
+        // Extract the payload part (everything after "v4.local.")
+        // Format: v4.local.{base64url_payload}
+        let parts: Vec<&str> = wrapped_token.split('.').collect();
+        if parts.len() < 3 {
+            return Err(PasetoError::CryptoError(
+                "Invalid wrapped token format".to_string(),
+            ));
+        }
+
+        // Build PASERK secret-wrap format: k4.secret-wrap.pie.{base64url_payload}
+        Ok(format!("k4.secret-wrap.pie.{}", parts[2]))
+    }
+
+    /// Unwrap an Ed25519 secret key using a wrapping key (PASERK secret-wrap)
+    ///
+    /// Decrypts a PASERK wrapped key string using a 32-byte wrapping key,
+    /// returning the original 64-byte Ed25519 secret key. Uses v4.local token
+    /// decryption internally to provide authenticated decryption.
+    ///
+    /// Format: `k4.secret-wrap.pie.{base64url_wrapped_token}`
+    ///
+    /// # Arguments
+    ///
+    /// * `wrapped_key` - PASERK secret-wrap key string
+    /// * `wrapping_key` - 32-byte wrapping key
+    ///
+    /// # Returns
+    ///
+    /// The unwrapped 64-byte Ed25519 secret key
+    ///
+    /// # Errors
+    ///
+    /// Returns `PasetoError::InvalidPaserkFormat` if the format is invalid
+    /// Returns `PasetoError::AuthenticationFailed` if decryption fails
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use fast_paseto::KeyManager;
+    /// use fast_paseto::KeyGenerator;
+    ///
+    /// let keypair = KeyGenerator::generate_ed25519_keypair();
+    /// let wrapping_key = KeyGenerator::generate_symmetric_key();
+    /// let wrapped = KeyManager::secret_wrap(&keypair.secret_key, &wrapping_key).unwrap();
+    /// let unwrapped = KeyManager::secret_unwrap(&wrapped, &wrapping_key).unwrap();
+    /// assert_eq!(keypair.secret_key, unwrapped);
+    /// ```
+    pub fn secret_unwrap(
+        wrapped_key: &str,
+        wrapping_key: &[u8; 32],
+    ) -> Result<[u8; 64], PasetoError> {
+        // Parse PASERK secret-wrap format: k4.secret-wrap.pie.{base64url_payload}
+        let parts: Vec<&str> = wrapped_key.split('.').collect();
+
+        if parts.len() != 4 {
+            return Err(PasetoError::InvalidPaserkFormat(
+                "PASERK secret-wrap must have exactly 4 parts separated by dots".to_string(),
+            ));
+        }
+
+        if parts[0] != "k4" {
+            return Err(PasetoError::InvalidPaserkFormat(format!(
+                "Unsupported PASERK version: {}",
+                parts[0]
+            )));
+        }
+
+        if parts[1] != "secret-wrap" {
+            return Err(PasetoError::InvalidPaserkFormat(format!(
+                "Expected 'secret-wrap', got '{}'",
+                parts[1]
+            )));
+        }
+
+        if parts[2] != "pie" {
+            return Err(PasetoError::InvalidPaserkFormat(format!(
+                "Expected 'pie', got '{}'",
+                parts[2]
+            )));
+        }
+
+        // Reconstruct v4.local token from the payload part
+        let token = format!("v4.local.{}", parts[3]);
+
+        // Use v4.local decryption to unwrap the key
+        let verifier = TokenVerifier::new(None);
+        let key_bytes = verifier.v4_local_decrypt(
+            &token,
+            wrapping_key,
+            None, // No footer
+            None, // No implicit assertion
+        )?;
+
+        // Validate key length
+        if key_bytes.len() != 64 {
+            return Err(PasetoError::InvalidPaserkFormat(format!(
+                "Unwrapped secret key must be 64 bytes, got {}",
+                key_bytes.len()
+            )));
+        }
+
+        let mut key = [0u8; 64];
+        key.copy_from_slice(&key_bytes);
+        Ok(key)
+    }
+
     /// Serialize a symmetric key to PASERK local format
     ///
     /// Format: `k4.local.{base64url_key}`
@@ -659,6 +964,105 @@ mod tests {
 
         // Different inputs should produce different hashes
         assert_ne!(hash1, hash2);
+    }
+
+    // PASERK Key Wrapping Tests
+
+    #[test]
+    fn test_local_wrap_format() {
+        let key = KeyGenerator::generate_symmetric_key();
+        let wrapping_key = KeyGenerator::generate_symmetric_key();
+        let wrapped = KeyManager::local_wrap(&key, &wrapping_key).unwrap();
+
+        // Check format
+        assert!(wrapped.starts_with("k4.local-wrap.pie."));
+
+        // Should have exactly 4 parts
+        let parts: Vec<&str> = wrapped.split('.').collect();
+        assert_eq!(parts.len(), 4);
+        assert_eq!(parts[0], "k4");
+        assert_eq!(parts[1], "local-wrap");
+        assert_eq!(parts[2], "pie");
+    }
+
+    #[test]
+    fn test_local_wrap_unwrap_roundtrip() {
+        let key = KeyGenerator::generate_symmetric_key();
+        let wrapping_key = KeyGenerator::generate_symmetric_key();
+
+        // Wrap and unwrap
+        let wrapped = KeyManager::local_wrap(&key, &wrapping_key).unwrap();
+        let unwrapped = KeyManager::local_unwrap(&wrapped, &wrapping_key).unwrap();
+
+        // Should get back the original key
+        assert_eq!(key, unwrapped);
+    }
+
+    #[test]
+    fn test_local_unwrap_wrong_key() {
+        let key = KeyGenerator::generate_symmetric_key();
+        let wrapping_key1 = KeyGenerator::generate_symmetric_key();
+        let wrapping_key2 = KeyGenerator::generate_symmetric_key();
+
+        // Wrap with key1
+        let wrapped = KeyManager::local_wrap(&key, &wrapping_key1).unwrap();
+
+        // Try to unwrap with key2 - should fail
+        let result = KeyManager::local_unwrap(&wrapped, &wrapping_key2);
+        assert!(result.is_err());
+        assert!(matches!(result, Err(PasetoError::AuthenticationFailed)));
+    }
+
+    #[test]
+    fn test_local_unwrap_invalid_format() {
+        let wrapping_key = KeyGenerator::generate_symmetric_key();
+
+        // Test various invalid formats
+        let invalid_formats = vec![
+            "k4.local.test",              // Wrong type
+            "k4.local-wrap.test",         // Missing part
+            "k3.local-wrap.pie.test",     // Wrong version
+            "k4.secret-wrap.pie.test",    // Wrong type
+            "k4.local-wrap.invalid.test", // Wrong algorithm
+        ];
+
+        for invalid in invalid_formats {
+            let result = KeyManager::local_unwrap(invalid, &wrapping_key);
+            assert!(result.is_err(), "Should fail for: {}", invalid);
+        }
+    }
+
+    #[test]
+    fn test_local_wrap_different_keys_different_output() {
+        let key = KeyGenerator::generate_symmetric_key();
+        let wrapping_key1 = KeyGenerator::generate_symmetric_key();
+        let wrapping_key2 = KeyGenerator::generate_symmetric_key();
+
+        // Wrap with different wrapping keys
+        let wrapped1 = KeyManager::local_wrap(&key, &wrapping_key1).unwrap();
+        let wrapped2 = KeyManager::local_wrap(&key, &wrapping_key2).unwrap();
+
+        // Should produce different wrapped keys
+        assert_ne!(wrapped1, wrapped2);
+    }
+
+    #[test]
+    fn test_local_wrap_randomness() {
+        let key = KeyGenerator::generate_symmetric_key();
+        let wrapping_key = KeyGenerator::generate_symmetric_key();
+
+        // Wrap the same key twice
+        let wrapped1 = KeyManager::local_wrap(&key, &wrapping_key).unwrap();
+        let wrapped2 = KeyManager::local_wrap(&key, &wrapping_key).unwrap();
+
+        // Should produce different wrapped keys due to random nonce
+        assert_ne!(wrapped1, wrapped2);
+
+        // But both should unwrap to the same key
+        let unwrapped1 = KeyManager::local_unwrap(&wrapped1, &wrapping_key).unwrap();
+        let unwrapped2 = KeyManager::local_unwrap(&wrapped2, &wrapping_key).unwrap();
+        assert_eq!(unwrapped1, unwrapped2);
+        assert_eq!(unwrapped1, key);
     }
 
     // Property-based tests
