@@ -444,3 +444,73 @@ def secret_unwrap(wrapped_key: str, wrapping_key: bytes) -> bytes:
         PasetoCryptoError: If decryption fails
     """
     ...
+
+def local_pw_encrypt(key: bytes, password: str) -> str:
+    """Encrypt a symmetric key with a password (PASERK local-pw).
+
+    Uses Argon2id for key derivation and v4.local encryption.
+    Format: k4.local-pw.{base64url_encrypted_data}
+
+    Args:
+        key: A 32-byte symmetric key to encrypt
+        password: Password string
+
+    Returns:
+        str: A PASERK local-pw encrypted key string
+
+    Raises:
+        PasetoKeyError: If the key is not exactly 32 bytes
+        PasetoCryptoError: If encryption fails
+    """
+    ...
+
+def local_pw_decrypt(encrypted: str, password: str) -> bytes:
+    """Decrypt a symmetric key with a password (PASERK local-pw).
+
+    Args:
+        encrypted: A PASERK local-pw encrypted key string
+        password: Password string
+
+    Returns:
+        bytes: The decrypted 32-byte symmetric key
+
+    Raises:
+        PasetoValidationError: If the format is invalid
+        PasetoCryptoError: If decryption fails (wrong password)
+    """
+    ...
+
+def secret_pw_encrypt(secret_key: bytes, password: str) -> str:
+    """Encrypt an Ed25519 secret key with a password (PASERK secret-pw).
+
+    Uses Argon2id for key derivation and v4.local encryption.
+    Format: k4.secret-pw.{base64url_encrypted_data}
+
+    Args:
+        secret_key: A 64-byte Ed25519 secret key to encrypt
+        password: Password string
+
+    Returns:
+        str: A PASERK secret-pw encrypted key string
+
+    Raises:
+        PasetoKeyError: If the key is not exactly 64 bytes
+        PasetoCryptoError: If encryption fails
+    """
+    ...
+
+def secret_pw_decrypt(encrypted: str, password: str) -> bytes:
+    """Decrypt an Ed25519 secret key with a password (PASERK secret-pw).
+
+    Args:
+        encrypted: A PASERK secret-pw encrypted key string
+        password: Password string
+
+    Returns:
+        bytes: The decrypted 64-byte Ed25519 secret key
+
+    Raises:
+        PasetoValidationError: If the format is invalid
+        PasetoCryptoError: If decryption fails (wrong password)
+    """
+    ...
