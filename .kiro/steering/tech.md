@@ -1,83 +1,72 @@
+---
+inclusion: always
+---
+
 # Technology Stack
 
-## Languages
-- Rust (core implementation)
-- Python (bindings and user-facing API)
+## Core Technologies
+- **Rust (Edition 2024)**: All cryptographic operations and core logic
+- **Python 3.11+**: User-facing API via PyO3 bindings
+- **PyO3 0.27.0**: Rust-Python FFI layer
+- **Maturin**: Build tool for PyO3 projects (bridges Cargo and Python packaging)
 
-## Build System
-- Maturin: Rust-Python build tool for PyO3 projects
-- Cargo: Rust package manager
+## Critical Build Rules
+- After ANY Rust code changes in `src/`, run `maturin develop` to rebuild the extension
+- Python has NO runtime dependencies - this is a pure Rust extension module
+- Use `uv` for Python environment management (not pip/venv directly)
+- Windows users: Use `.venv\Scripts\activate` instead of `source .venv/bin/activate`
 
-## Key Dependencies
-- PyO3 (0.27.0): Rust bindings for Python
-- Rust Edition 2024
+## Development Workflow
 
-## Python Requirements
-- Python 3.11+
-- No runtime Python dependencies (pure Rust extension)
-
-## Common Commands
-
-### Development Setup
+### Initial Setup
 ```bash
-# Create virtual environment
 uv venv
-source .venv/bin/activate  # or .venv\Scripts\activate on Windows
-
-# Install in development mode
+.venv\Scripts\activate  # Windows
 maturin develop
 ```
 
-### Building
+### After Modifying Rust Code
 ```bash
-# Build release wheel
-maturin build --release
-
-# Build and install locally
-maturin develop --release
+maturin develop  # Required to see changes in Python
+pytest           # Verify changes work
 ```
 
-### Testing
+### Before Committing
 ```bash
-# Run Rust tests
-cargo test
-
-# Run Python tests (after maturin develop)
-pytest
+cargo fmt        # Format Rust code
+cargo clippy     # Lint Rust code
+ruff format .    # Format Python code
+ruff check .     # Lint Python code
+uvx ty check     # Type check Python stubs
+cargo test       # Run Rust unit tests
+pytest           # Run Python integration tests
 ```
 
-### Linting & Formatting
+Or use pre-commit hooks:
 ```bash
-# Rust
-cargo fmt
-cargo clippy
-
-# Python
-ruff check .
-ruff format .
-
-# Type checking
-uvx ty check
-```
-
-### Pre-commit Hooks
-```bash
-# Install pre-commit
-pip install pre-commit
-
-# Install hooks
-pre-commit install
-
-# Run all hooks manually
 pre-commit run --all-files
 ```
 
-Configured hooks:
-- ty: Type checking (via uvx)
-- ruff: Linting with auto-fix
-- ruff-format: Code formatting
-- pytest: Tests (on pre-push)
+## Testing Strategy
+- **Rust tests** (`cargo test`): Unit tests for internal logic, run in Rust
+- **Python tests** (`pytest`): Integration tests for Python API, require `maturin develop` first
+- Never skip `maturin develop` before running pytest - tests will fail with import errors
+- Pre-commit runs pytest on pre-push (not pre-commit) to avoid slow commits
 
-## Cryptographic Algorithms (v4 - Primary)
-- v4.local: XChaCha20 + BLAKE2b-MAC (32-byte key)
-- v4.public: Ed25519 (64-byte secret, 32-byte public)
+## Code Quality Tools
+- **Rust**: `cargo fmt` (formatting), `cargo clippy` (linting)
+- **Python**: `ruff format` (formatting), `ruff check` (linting), `uvx ty` (type checking)
+- All configured in `.pre-commit-config.yaml` with auto-fix enabled where safe
+
+## Cryptographic Standards (PASETO v4)
+- **v4.local**: XChaCha20-Poly1305 encryption + BLAKE2b-MAC (32-byte symmetric key)
+- **v4.public**: Ed25519 signatures (64-byte secret key, 32-byte public key)
+- All crypto operations MUST stay in Rust - never implement in Python
+- Key lengths are validated at runtime - incorrect sizes will error
+
+## Common Pitfalls
+- Forgetting `maturin develop` after Rust changes (most common error)
+- Using `pip install -e .` instead of `maturin develop` (won't work)
+- Trying to run pytest without building the extension first
+- Adding Python runtime dependencies (violates pure-extension design)
+- Implementing crypto in Python instead of Rust (security risk)

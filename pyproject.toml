@@ -4,11 +4,13 @@ build-backend = "maturin"
 
 [project]
 name = "fast-paseto"
-version = "0.1.0"
+version = "0.0.1"
 description = "High-performance PASETO tokens implemented in Rust with Python bindings"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "hypothesis>=6.148.8",
+]
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
@@ -19,6 +21,13 @@ features = ["pyo3/extension-module"]
 
 [dependency-groups]
 dev = [
+    "pytest>=9.0.2",
     "ruff>=0.14.10",
     "ty>=0.0.6",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
