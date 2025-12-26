@@ -475,6 +475,42 @@ impl Paseto {
                     implicit_assertion,
                 )?
             }
+            (Version::V2, Purpose::Local) => {
+                // v2.local requires 32-byte key
+                if key_bytes.len() != 32 {
+                    return Err(PasetoKeyError::new_err(format!(
+                        "Invalid key length for v2.local: expected 32 bytes, got {}",
+                        key_bytes.len()
+                    )));
+                }
+                let key_array: [u8; 32] = key_bytes
+                    .try_into()
+                    .map_err(|_| PasetoKeyError::new_err("Failed to convert key to array"))?;
+                // v2 does not support implicit assertions
+                TokenGenerator::v2_local_encrypt(
+                    &key_array,
+                    &payload_bytes,
+                    footer_bytes.as_deref(),
+                )?
+            }
+            (Version::V2, Purpose::Public) => {
+                // v2.public requires 64-byte secret key
+                if key_bytes.len() != 64 {
+                    return Err(PasetoKeyError::new_err(format!(
+                        "Invalid key length for v2.public: expected 64 bytes, got {}",
+                        key_bytes.len()
+                    )));
+                }
+                let key_array: [u8; 64] = key_bytes
+                    .try_into()
+                    .map_err(|_| PasetoKeyError::new_err("Failed to convert key to array"))?;
+                // v2 does not support implicit assertions
+                TokenGenerator::v2_public_sign(
+                    &key_array,
+                    &payload_bytes,
+                    footer_bytes.as_deref(),
+                )?
+            }
             _ => {
                 return Err(PasetoValidationError::new_err(format!(
                     "Unsupported version/purpose combination: {}/{}",
@@ -639,6 +675,42 @@ impl Paseto {
                     &key_array,
                     footer_bytes.as_deref(),
                     implicit_assertion,
+                )?
+            }
+            (Version::V2, Purpose::Local) => {
+                // v2.local requires 32-byte key
+                if key_bytes.len() != 32 {
+                    return Err(PasetoKeyError::new_err(format!(
+                        "Invalid key length for v2.local: expected 32 bytes, got {}",
+                        key_bytes.len()
+                    )));
+                }
+                let key_array: [u8; 32] = key_bytes
+                    .try_into()
+                    .map_err(|_| PasetoKeyError::new_err("Failed to convert key to array"))?;
+                // v2 does not support implicit assertions
+                verifier.v2_local_decrypt(
+                    token,
+                    &key_array,
+                    footer_bytes.as_deref(),
+                )?
+            }
+            (Version::V2, Purpose::Public) => {
+                // v2.public requires 32-byte public key
+                if key_bytes.len() != 32 {
+                    return Err(PasetoKeyError::new_err(format!(
+                        "Invalid key length for v2.public: expected 32 bytes, got {}",
+                        key_bytes.len()
+                    )));
+                }
+                let key_array: [u8; 32] = key_bytes
+                    .try_into()
+                    .map_err(|_| PasetoKeyError::new_err("Failed to convert key to array"))?;
+                // v2 does not support implicit assertions
+                verifier.v2_public_verify(
+                    token,
+                    &key_array,
+                    footer_bytes.as_deref(),
                 )?
             }
             _ => {
@@ -964,6 +1036,42 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
                     implicit_assertion,
                 )?
             }
+            (Version::V2, Purpose::Local) => {
+                // v2.local requires 32-byte key
+                if key_bytes.len() != 32 {
+                    return Err(PasetoKeyError::new_err(format!(
+                        "Invalid key length for v2.local: expected 32 bytes, got {}",
+                        key_bytes.len()
+                    )));
+                }
+                let key_array: [u8; 32] = key_bytes
+                    .try_into()
+                    .map_err(|_| PasetoKeyError::new_err("Failed to convert key to array"))?;
+                // v2 does not support implicit assertions
+                TokenGenerator::v2_local_encrypt(
+                    &key_array,
+                    &payload_bytes,
+                    footer_bytes.as_deref(),
+                )?
+            }
+            (Version::V2, Purpose::Public) => {
+                // v2.public requires 64-byte secret key
+                if key_bytes.len() != 64 {
+                    return Err(PasetoKeyError::new_err(format!(
+                        "Invalid key length for v2.public: expected 64 bytes, got {}",
+                        key_bytes.len()
+                    )));
+                }
+                let key_array: [u8; 64] = key_bytes
+                    .try_into()
+                    .map_err(|_| PasetoKeyError::new_err("Failed to convert key to array"))?;
+                // v2 does not support implicit assertions
+                TokenGenerator::v2_public_sign(
+                    &key_array,
+                    &payload_bytes,
+                    footer_bytes.as_deref(),
+                )?
+            }
             _ => {
                 return Err(PasetoValidationError::new_err(format!(
                     "Unsupported version/purpose combination: {}/{}",
@@ -1143,6 +1251,42 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
                     &key_array,
                     footer_bytes.as_deref(),
                     implicit_assertion,
+                )?
+            }
+            (Version::V2, Purpose::Local) => {
+                // v2.local requires 32-byte key
+                if key_bytes.len() != 32 {
+                    return Err(PasetoKeyError::new_err(format!(
+                        "Invalid key length for v2.local: expected 32 bytes, got {}",
+                        key_bytes.len()
+                    )));
+                }
+                let key_array: [u8; 32] = key_bytes
+                    .try_into()
+                    .map_err(|_| PasetoKeyError::new_err("Failed to convert key to array"))?;
+                // v2 does not support implicit assertions
+                verifier.v2_local_decrypt(
+                    token,
+                    &key_array,
+                    footer_bytes.as_deref(),
+                )?
+            }
+            (Version::V2, Purpose::Public) => {
+                // v2.public requires 32-byte public key
+                if key_bytes.len() != 32 {
+                    return Err(PasetoKeyError::new_err(format!(
+                        "Invalid key length for v2.public: expected 32 bytes, got {}",
+                        key_bytes.len()
+                    )));
+                }
+                let key_array: [u8; 32] = key_bytes
+                    .try_into()
+                    .map_err(|_| PasetoKeyError::new_err("Failed to convert key to array"))?;
+                // v2 does not support implicit assertions
+                verifier.v2_public_verify(
+                    token,
+                    &key_array,
+                    footer_bytes.as_deref(),
                 )?
             }
             _ => {

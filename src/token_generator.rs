@@ -21,6 +21,9 @@ use sha2::Sha384;
 // v3.public imports
 use p384::ecdsa::{Signature as P384Signature, SigningKey as P384SigningKey, signature::Signer};
 
+// v2.local imports
+use chacha20poly1305::{XChaCha20Poly1305, aead::{Aead, Payload}};
+
 /// Token generation for all PASETO versions
 pub struct TokenGenerator;
 
@@ -87,6 +90,81 @@ impl TokenGenerator {
 
         // Build final token string
         let mut token = format!("v4.public.{}", encoded_payload);
+        if let Some(f) = footer {
+            if !f.is_empty() {
+                let encoded_footer = URL_SAFE_NO_PAD.encode(f);
+                token.push('.');
+                token.push_str(&encoded_footer);
+            }
+        }
+
+        Ok(token)
+    }
+
+    /// Generate a v2.public token (legacy asymmetric signing)
+    ///
+    /// Uses Ed25519 signatures for token authentication.
+    /// This is the legacy version - prefer v4.public for new implementations.
+    ///
+    /// # Arguments
+    /// * `secret_key` - 64-byte Ed25519 secret key
+    /// * `payload` - Token payload as bytes
+    /// * `footer` - Optional footer data
+    ///
+    /// # Returns
+    /// * `Result<String, PasetoError>` - Token string or error
+    ///
+    /// # Errors
+    /// Returns `PasetoError::InvalidKeyLength` if secret key is not 64 bytes
+    /// Returns `PasetoError::InvalidKeyFormat` if secret key is not a valid Ed25519 key
+    ///
+    /// # Token Format
+    /// `v2.public.base64url(payload || signature)[.base64url(footer)]`
+    ///
+    /// # Note
+    /// v2.public does NOT support implicit assertions (unlike v4.public).
+    /// The PAE format is: PAE("v2.public.", payload, footer)
+    pub fn v2_public_sign(
+        secret_key: &[u8],
+        payload: &[u8],
+        footer: Option<&[u8]>,
+    ) -> Result<String, PasetoError> {
+        use ed25519_dalek::{Signer, SigningKey};
+
+        // Validate key length
+        if secret_key.len() != 64 {
+            return Err(PasetoError::InvalidKeyLength {
+                expected: 64,
+                actual: secret_key.len(),
+            });
+        }
+
+        // Convert to Ed25519 signing key
+        let key_bytes: [u8; 64] = secret_key.try_into().unwrap();
+        let signing_key = SigningKey::from_keypair_bytes(&key_bytes)
+            .map_err(|e| PasetoError::InvalidKeyFormat(format!("Invalid Ed25519 key: {}", e)))?;
+
+        // Build pre-authentication encoding for signature
+        // PAE(version.purpose, payload, footer) - NO implicit assertion in v2
+        let header = b"v2.public.";
+        let footer_bytes = footer.unwrap_or(b"");
+
+        let pae_pieces: Vec<&[u8]> = vec![header, payload, footer_bytes];
+        let m2 = Pae::encode(&pae_pieces);
+
+        // Sign the PAE
+        let signature = signing_key.sign(&m2);
+
+        // Concatenate payload || signature
+        let mut token_bytes = Vec::with_capacity(payload.len() + 64);
+        token_bytes.extend_from_slice(payload);
+        token_bytes.extend_from_slice(&signature.to_bytes());
+
+        // Encode as base64url
+        let encoded_payload = URL_SAFE_NO_PAD.encode(&token_bytes);
+
+        // Build final token string
+        let mut token = format!("v2.public.{}", encoded_payload);
         if let Some(f) = footer {
             if !f.is_empty() {
                 let encoded_footer = URL_SAFE_NO_PAD.encode(f);
@@ -364,6 +442,90 @@ impl TokenGenerator {
 
         // Build final token string
         let mut token = format!("v3.local.{}", encoded_payload);
+        if let Some(f) = footer {
+            if !f.is_empty() {
+                let encoded_footer = URL_SAFE_NO_PAD.encode(f);
+                token.push('.');
+                token.push_str(&encoded_footer);
+            }
+        }
+
+        Ok(token)
+    }
+
+    /// Generate a v2.local token (legacy symmetric encryption)
+    ///
+    /// Uses XChaCha20-Poly1305 AEAD for authenticated encryption.
+    /// This is a legacy version - prefer v4.local for new applications.
+    ///
+    /// # Arguments
+    /// * `key` - 32-byte symmetric key
+    /// * `payload` - Token payload as bytes
+    /// * `footer` - Optional footer data
+    ///
+    /// # Returns
+    /// * `Result<String, PasetoError>` - Token string or error
+    ///
+    /// # Errors
+    /// Returns `PasetoError::InvalidKeyLength` if key is not 32 bytes
+    ///
+    /// # Token Format
+    /// `v2.local.base64url(nonce || ciphertext || tag)[.base64url(footer)]`
+    ///
+    /// # Note
+    /// v2 does NOT support implicit assertions (unlike v3/v4)
+    pub fn v2_local_encrypt(
+        key: &[u8],
+        payload: &[u8],
+        footer: Option<&[u8]>,
+    ) -> Result<String, PasetoError> {
+        // Validate key length
+        if key.len() != 32 {
+            return Err(PasetoError::InvalidKeyLength {
+                expected: 32,
+                actual: key.len(),
+            });
+        }
+
+        // Convert key to array
+        let key_array: [u8; 32] = key.try_into().unwrap();
+
+        // Generate random 24-byte nonce for XChaCha20-Poly1305
+        let mut nonce = [0u8; 24];
+        OsRng.fill_bytes(&mut nonce);
+
+        // Build pre-authentication encoding for AAD
+        // PAE("v2.local.", nonce, footer)
+        let header = b"v2.local.";
+        let footer_bytes = footer.unwrap_or(b"");
+
+        let pae_pieces: Vec<&[u8]> = vec![header, &nonce, footer_bytes];
+        let pae = Pae::encode(&pae_pieces);
+
+        // Create XChaCha20-Poly1305 cipher
+        let cipher = XChaCha20Poly1305::new((&key_array).into());
+
+        // Encrypt with AAD (PAE)
+        let ciphertext = cipher
+            .encrypt(
+                (&nonce).into(),
+                Payload {
+                    msg: payload,
+                    aad: &pae,
+                },
+            )
+            .map_err(|e| PasetoError::CryptoError(format!("Encryption failed: {}", e)))?;
+
+        // Concatenate nonce || ciphertext (ciphertext includes 16-byte tag)
+        let mut token_bytes = Vec::with_capacity(24 + ciphertext.len());
+        token_bytes.extend_from_slice(&nonce);
+        token_bytes.extend_from_slice(&ciphertext);
+
+        // Encode as base64url
+        let encoded_payload = URL_SAFE_NO_PAD.encode(&token_bytes);
+
+        // Build final token string
+        let mut token = format!("v2.local.{}", encoded_payload);
         if let Some(f) = footer {
             if !f.is_empty() {
                 let encoded_footer = URL_SAFE_NO_PAD.encode(f);
@@ -1005,6 +1167,319 @@ mod tests {
             .unwrap();
 
         assert_eq!(verified, payload);
+    }
+
+    // v2.public tests
+    #[test]
+    fn test_v2_public_sign_basic() {
+        use crate::key_generator::KeyGenerator;
+
+        let keypair = KeyGenerator::generate_ed25519_keypair();
+        let payload = b"test payload";
+        let result = TokenGenerator::v2_public_sign(&keypair.secret_key, payload, None);
+        assert!(result.is_ok());
+
+        let token = result.unwrap();
+        assert!(token.starts_with("v2.public."));
+    }
+
+    #[test]
+    fn test_v2_public_sign_with_footer() {
+        use crate::key_generator::KeyGenerator;
+
+        let keypair = KeyGenerator::generate_ed25519_keypair();
+        let payload = b"test payload";
+        let footer = b"test footer";
+        let result = TokenGenerator::v2_public_sign(&keypair.secret_key, payload, Some(footer));
+        assert!(result.is_ok());
+
+        let token = result.unwrap();
+        assert!(token.starts_with("v2.public."));
+
+        // Token should have 4 parts when footer is present
+        let parts: Vec<&str> = token.split('.').collect();
+        assert_eq!(parts.len(), 4);
+    }
+
+    #[test]
+    fn test_v2_public_sign_invalid_key_length() {
+        let key = [0u8; 32]; // Wrong length (should be 64)
+        let payload = b"test payload";
+        let result = TokenGenerator::v2_public_sign(&key, payload, None);
+        assert!(result.is_err());
+
+        match result {
+            Err(PasetoError::InvalidKeyLength { expected, actual }) => {
+                assert_eq!(expected, 64);
+                assert_eq!(actual, 32);
+            }
+            _ => panic!("Expected InvalidKeyLength error"),
+        }
+    }
+
+    #[test]
+    fn test_v2_public_sign_invalid_key_format() {
+        let key = [0u8; 64]; // Correct length but invalid key
+        let payload = b"test payload";
+        let result = TokenGenerator::v2_public_sign(&key, payload, None);
+        assert!(result.is_err());
+
+        match result {
+            Err(PasetoError::InvalidKeyFormat(_)) => {
+                // Expected
+            }
+            _ => panic!("Expected InvalidKeyFormat error"),
+        }
+    }
+
+    #[test]
+    fn test_v2_public_sign_empty_payload() {
+        use crate::key_generator::KeyGenerator;
+
+        let keypair = KeyGenerator::generate_ed25519_keypair();
+        let payload = b"";
+        let result = TokenGenerator::v2_public_sign(&keypair.secret_key, payload, None);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_v2_public_sign_empty_footer() {
+        use crate::key_generator::KeyGenerator;
+
+        let keypair = KeyGenerator::generate_ed25519_keypair();
+        let payload = b"test payload";
+        let footer = b"";
+        let result = TokenGenerator::v2_public_sign(&keypair.secret_key, payload, Some(footer));
+        assert!(result.is_ok());
+
+        let token = result.unwrap();
+        // Empty footer should not add a fourth part
+        let parts: Vec<&str> = token.split('.').collect();
+        assert_eq!(parts.len(), 3);
+    }
+
+    #[test]
+    fn test_v2_public_sign_deterministic() {
+        use crate::key_generator::KeyGenerator;
+
+        // Same key and payload should produce the same token (Ed25519 is deterministic)
+        let keypair = KeyGenerator::generate_ed25519_keypair();
+        let payload = b"test payload";
+
+        let token1 = TokenGenerator::v2_public_sign(&keypair.secret_key, payload, None).unwrap();
+        let token2 = TokenGenerator::v2_public_sign(&keypair.secret_key, payload, None).unwrap();
+
+        assert_eq!(token1, token2, "Ed25519 signatures should be deterministic");
+    }
+
+    #[test]
+    fn test_v2_public_sign_token_format() {
+        use crate::key_generator::KeyGenerator;
+
+        let keypair = KeyGenerator::generate_ed25519_keypair();
+        let payload = b"test payload";
+        let token = TokenGenerator::v2_public_sign(&keypair.secret_key, payload, None).unwrap();
+
+        // Token should have format: v2.public.base64url_payload
+        let parts: Vec<&str> = token.split('.').collect();
+        assert_eq!(parts.len(), 3);
+        assert_eq!(parts[0], "v2");
+        assert_eq!(parts[1], "public");
+
+        // Payload should be valid base64url
+        let decode_result = URL_SAFE_NO_PAD.decode(parts[2]);
+        assert!(decode_result.is_ok());
+    }
+
+    #[test]
+    fn test_v2_public_sign_roundtrip() {
+        use crate::key_generator::KeyGenerator;
+
+        let keypair = KeyGenerator::generate_ed25519_keypair();
+        let payload = b"test payload for v2.public roundtrip";
+
+        // Sign
+        let token = TokenGenerator::v2_public_sign(&keypair.secret_key, payload, None).unwrap();
+
+        // Verify
+        let verifier = TokenVerifier::new(None);
+        let verified = verifier
+            .v2_public_verify(&token, &keypair.public_key, None)
+            .unwrap();
+
+        assert_eq!(verified, payload);
+    }
+
+    #[test]
+    fn test_v2_public_sign_roundtrip_with_footer() {
+        use crate::key_generator::KeyGenerator;
+
+        let keypair = KeyGenerator::generate_ed25519_keypair();
+        let payload = b"test payload";
+        let footer = b"test footer";
+
+        // Sign
+        let token =
+            TokenGenerator::v2_public_sign(&keypair.secret_key, payload, Some(footer)).unwrap();
+
+        // Verify
+        let verifier = TokenVerifier::new(None);
+        let verified = verifier
+            .v2_public_verify(&token, &keypair.public_key, Some(footer))
+            .unwrap();
+
+        assert_eq!(verified, payload);
+    }
+
+    // v2.local tests
+    #[test]
+    fn test_v2_local_encrypt_basic() {
+        let key = [0u8; 32];
+        let payload = b"test payload";
+        let result = TokenGenerator::v2_local_encrypt(&key, payload, None);
+        assert!(result.is_ok());
+
+        let token = result.unwrap();
+        assert!(token.starts_with("v2.local."));
+    }
+
+    #[test]
+    fn test_v2_local_encrypt_with_footer() {
+        let key = [0u8; 32];
+        let payload = b"test payload";
+        let footer = b"test footer";
+        let result = TokenGenerator::v2_local_encrypt(&key, payload, Some(footer));
+        assert!(result.is_ok());
+
+        let token = result.unwrap();
+        assert!(token.starts_with("v2.local."));
+
+        // Token should have 4 parts when footer is present
+        let parts: Vec<&str> = token.split('.').collect();
+        assert_eq!(parts.len(), 4);
+    }
+
+    #[test]
+    fn test_v2_local_encrypt_invalid_key_length() {
+        let key = [0u8; 16]; // Wrong length
+        let payload = b"test payload";
+        let result = TokenGenerator::v2_local_encrypt(&key, payload, None);
+        assert!(result.is_err());
+
+        match result {
+            Err(PasetoError::InvalidKeyLength { expected, actual }) => {
+                assert_eq!(expected, 32);
+                assert_eq!(actual, 16);
+            }
+            _ => panic!("Expected InvalidKeyLength error"),
+        }
+    }
+
+    #[test]
+    fn test_v2_local_encrypt_empty_payload() {
+        let key = [0u8; 32];
+        let payload = b"";
+        let result = TokenGenerator::v2_local_encrypt(&key, payload, None);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_v2_local_encrypt_empty_footer() {
+        let key = [0u8; 32];
+        let payload = b"test payload";
+        let footer = b"";
+        let result = TokenGenerator::v2_local_encrypt(&key, payload, Some(footer));
+        assert!(result.is_ok());
+
+        let token = result.unwrap();
+        // Empty footer should not add a fourth part
+        let parts: Vec<&str> = token.split('.').collect();
+        assert_eq!(parts.len(), 3);
+    }
+
+    #[test]
+    fn test_v2_local_encrypt_randomness() {
+        // Generate two tokens with the same key and payload
+        // They should be different due to random nonce
+        let key = [0u8; 32];
+        let payload = b"test payload";
+
+        let token1 = TokenGenerator::v2_local_encrypt(&key, payload, None).unwrap();
+        let token2 = TokenGenerator::v2_local_encrypt(&key, payload, None).unwrap();
+
+        assert_ne!(token1, token2, "Tokens should differ due to random nonce");
+    }
+
+    #[test]
+    fn test_v2_local_encrypt_token_format() {
+        let key = [0u8; 32];
+        let payload = b"test payload";
+        let token = TokenGenerator::v2_local_encrypt(&key, payload, None).unwrap();
+
+        // Token should have format: v2.local.base64url_payload
+        let parts: Vec<&str> = token.split('.').collect();
+        assert_eq!(parts.len(), 3);
+        assert_eq!(parts[0], "v2");
+        assert_eq!(parts[1], "local");
+
+        // Payload should be valid base64url
+        let decode_result = URL_SAFE_NO_PAD.decode(parts[2]);
+        assert!(decode_result.is_ok());
+
+        // Decoded payload should be at least 24 (nonce) + 16 (tag) = 40 bytes
+        let decoded = decode_result.unwrap();
+        assert!(
+            decoded.len() >= 40,
+            "Decoded payload should be at least 40 bytes"
+        );
+    }
+
+    #[test]
+    fn test_v2_local_roundtrip_basic() {
+        let key = [0u8; 32];
+        let payload = b"test payload";
+
+        // Encrypt
+        let token = TokenGenerator::v2_local_encrypt(&key, payload, None).unwrap();
+
+        // Decrypt
+        let verifier = TokenVerifier::new(None);
+        let decrypted = verifier.v2_local_decrypt(&token, &key, None).unwrap();
+
+        assert_eq!(decrypted, payload);
+    }
+
+    #[test]
+    fn test_v2_local_roundtrip_with_footer() {
+        let key = [0u8; 32];
+        let payload = b"test payload";
+        let footer = b"test footer";
+
+        // Encrypt
+        let token = TokenGenerator::v2_local_encrypt(&key, payload, Some(footer)).unwrap();
+
+        // Decrypt
+        let verifier = TokenVerifier::new(None);
+        let decrypted = verifier
+            .v2_local_decrypt(&token, &key, Some(footer))
+            .unwrap();
+
+        assert_eq!(decrypted, payload);
+    }
+
+    #[test]
+    fn test_v2_local_roundtrip_large_payload() {
+        let key = [0u8; 32];
+        let payload = vec![0xABu8; 10000]; // 10KB payload
+
+        // Encrypt
+        let token = TokenGenerator::v2_local_encrypt(&key, &payload, None).unwrap();
+
+        // Decrypt
+        let verifier = TokenVerifier::new(None);
+        let decrypted = verifier.v2_local_decrypt(&token, &key, None).unwrap();
+
+        assert_eq!(decrypted, payload);
     }
 
     // Property-based tests
