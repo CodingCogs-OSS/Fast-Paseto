@@ -1792,6 +1792,63 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
         Ok(PyBytes::new(py, &decrypted).into())
     }
 
+    /// Load an Ed25519 private key from PEM format (PKCS#8)
+    ///
+    /// Parses a PEM-encoded Ed25519 private key in PKCS#8 format and returns
+    /// the 64-byte secret key suitable for use with v4.public tokens.
+    ///
+    /// Args:
+    ///     pem: PEM-encoded Ed25519 private key string
+    ///
+    /// Returns:
+    ///     bytes: A 64-byte Ed25519 secret key
+    ///
+    /// Raises:
+    ///     PasetoKeyError: If the PEM format is invalid or the key is not Ed25519
+    ///
+    /// Example:
+    ///     >>> import fast_paseto
+    ///     >>> pem = '''-----BEGIN PRIVATE KEY-----
+    ///     ... MC4CAQAwBQYDK2VwBCIEIGqPaUKpqt0MJjJgXgXgXgXgXgXgXgXgXgXgXgXgXgXg
+    ///     ... -----END PRIVATE KEY-----'''
+    ///     >>> secret_key = fast_paseto.ed25519_from_pem(pem)
+    ///     >>> len(secret_key)
+    ///     64
+    #[pyfunction]
+    fn ed25519_from_pem(py: Python<'_>, pem: &str) -> PyResult<Py<PyBytes>> {
+        let secret_key = KeyManager::ed25519_from_pem(pem)?;
+        Ok(PyBytes::new(py, &secret_key).into())
+    }
+
+    /// Load an Ed25519 public key from PEM format (SPKI)
+    ///
+    /// Parses a PEM-encoded Ed25519 public key in SPKI (Subject Public Key Info)
+    /// format and returns the 32-byte public key suitable for use with v4.public
+    /// token verification.
+    ///
+    /// Args:
+    ///     pem: PEM-encoded Ed25519 public key string
+    ///
+    /// Returns:
+    ///     bytes: A 32-byte Ed25519 public key
+    ///
+    /// Raises:
+    ///     PasetoKeyError: If the PEM format is invalid or the key is not Ed25519
+    ///
+    /// Example:
+    ///     >>> import fast_paseto
+    ///     >>> pem = '''-----BEGIN PUBLIC KEY-----
+    ///     ... MCowBQYDK2VwAyEAGb9F2CMCwPz0vPz0vPz0vPz0vPz0vPz0vPz0vPz0vPw=
+    ///     ... -----END PUBLIC KEY-----'''
+    ///     >>> public_key = fast_paseto.ed25519_public_from_pem(pem)
+    ///     >>> len(public_key)
+    ///     32
+    #[pyfunction]
+    fn ed25519_public_from_pem(py: Python<'_>, pem: &str) -> PyResult<Py<PyBytes>> {
+        let public_key = KeyManager::ed25519_public_from_pem(pem)?;
+        Ok(PyBytes::new(py, &public_key).into())
+    }
+
     m.add_function(wrap_pyfunction!(generate_symmetric_key, m)?)?;
     m.add_function(wrap_pyfunction!(generate_keypair, m)?)?;
     m.add_function(wrap_pyfunction!(encode, m)?)?;
@@ -1811,6 +1868,8 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(local_pw_decrypt, m)?)?;
     m.add_function(wrap_pyfunction!(secret_pw_encrypt, m)?)?;
     m.add_function(wrap_pyfunction!(secret_pw_decrypt, m)?)?;
+    m.add_function(wrap_pyfunction!(ed25519_from_pem, m)?)?;
+    m.add_function(wrap_pyfunction!(ed25519_public_from_pem, m)?)?;
 
     Ok(())
 }

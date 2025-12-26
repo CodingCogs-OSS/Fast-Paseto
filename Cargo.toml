@@ -13,7 +13,7 @@ pyo3 = "0.27.0"
 # Cryptographic primitives
 blake2 = "0.10"
 chacha20 = "0.9"
-ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+ed25519-dalek = { version = "2.1", features = ["rand_core", "pkcs8", "pem"] }
 rand = "0.8"
 subtle = "2.5"  # Constant-time comparisons
 

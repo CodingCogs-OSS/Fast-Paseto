@@ -514,3 +514,38 @@ def secret_pw_decrypt(encrypted: str, password: str) -> bytes:
         PasetoCryptoError: If decryption fails (wrong password)
     """
     ...
+
+def ed25519_from_pem(pem: str) -> bytes:
+    """Load an Ed25519 private key from PEM format (PKCS#8).
+
+    Parses a PEM-encoded Ed25519 private key in PKCS#8 format and returns
+    the 64-byte secret key suitable for use with v4.public tokens.
+
+    Args:
+        pem: PEM-encoded Ed25519 private key string
+
+    Returns:
+        bytes: A 64-byte Ed25519 secret key
+
+    Raises:
+        PasetoKeyError: If the PEM format is invalid or the key is not Ed25519
+    """
+    ...
+
+def ed25519_public_from_pem(pem: str) -> bytes:
+    """Load an Ed25519 public key from PEM format (SPKI).
+
+    Parses a PEM-encoded Ed25519 public key in SPKI (Subject Public Key Info)
+    format and returns the 32-byte public key suitable for use with v4.public
+    token verification.
+
+    Args:
+        pem: PEM-encoded Ed25519 public key string
+
+    Returns:
+        bytes: A 32-byte Ed25519 public key
+
+    Raises:
+        PasetoKeyError: If the PEM format is invalid or the key is not Ed25519
+    """
+    ...

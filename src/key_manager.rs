@@ -823,6 +823,99 @@ impl KeyManager {
             ))),
         }
     }
+
+    /// Load an Ed25519 private key from PEM format (PKCS#8)
+    ///
+    /// Parses a PEM-encoded Ed25519 private key in PKCS#8 format and returns
+    /// the 64-byte secret key suitable for use with v4.public tokens.
+    ///
+    /// # Arguments
+    ///
+    /// * `pem` - PEM-encoded Ed25519 private key string
+    ///
+    /// # Returns
+    ///
+    /// A 64-byte Ed25519 secret key
+    ///
+    /// # Errors
+    ///
+    /// Returns `PasetoError::InvalidPemFormat` if:
+    /// - The PEM format is invalid
+    /// - The key is not an Ed25519 key
+    /// - The key data is malformed
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use fast_paseto::KeyManager;
+    ///
+    /// let pem = r#"-----BEGIN PRIVATE KEY-----
+    /// MC4CAQAwBQYDK2VwBCIEIGqPaUKpqt0MJjJgXgXgXgXgXgXgXgXgXgXgXgXgXgXg
+    /// -----END PRIVATE KEY-----"#;
+    ///
+    /// let secret_key = KeyManager::ed25519_from_pem(pem);
+    /// ```
+    pub fn ed25519_from_pem(pem: &str) -> Result<[u8; 64], PasetoError> {
+        use ed25519_dalek::pkcs8::DecodePrivateKey;
+        use ed25519_dalek::SigningKey;
+
+        let signing_key = SigningKey::from_pkcs8_pem(pem).map_err(|e| {
+            PasetoError::InvalidPemFormat(format!("Failed to parse Ed25519 private key PEM: {}", e))
+        })?;
+
+        // Get the secret key bytes (32 bytes seed + 32 bytes public key = 64 bytes)
+        let mut secret_key = [0u8; 64];
+        secret_key[..32].copy_from_slice(signing_key.as_bytes());
+        secret_key[32..].copy_from_slice(signing_key.verifying_key().as_bytes());
+
+        Ok(secret_key)
+    }
+
+    /// Load an Ed25519 public key from PEM format (SPKI)
+    ///
+    /// Parses a PEM-encoded Ed25519 public key in SPKI (Subject Public Key Info)
+    /// format and returns the 32-byte public key suitable for use with v4.public
+    /// token verification.
+    ///
+    /// # Arguments
+    ///
+    /// * `pem` - PEM-encoded Ed25519 public key string
+    ///
+    /// # Returns
+    ///
+    /// A 32-byte Ed25519 public key
+    ///
+    /// # Errors
+    ///
+    /// Returns `PasetoError::InvalidPemFormat` if:
+    /// - The PEM format is invalid
+    /// - The key is not an Ed25519 key
+    /// - The key data is malformed
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use fast_paseto::KeyManager;
+    ///
+    /// let pem = r#"-----BEGIN PUBLIC KEY-----
+    /// MCowBQYDK2VwAyEAGb9F2CMCwPz0vPz0vPz0vPz0vPz0vPz0vPz0vPz0vPw=
+    /// -----END PUBLIC KEY-----"#;
+    ///
+    /// let public_key = KeyManager::ed25519_public_from_pem(pem);
+    /// ```
+    pub fn ed25519_public_from_pem(pem: &str) -> Result<[u8; 32], PasetoError> {
+        use ed25519_dalek::pkcs8::DecodePublicKey;
+        use ed25519_dalek::VerifyingKey;
+
+        let verifying_key = VerifyingKey::from_public_key_pem(pem).map_err(|e| {
+            PasetoError::InvalidPemFormat(format!("Failed to parse Ed25519 public key PEM: {}", e))
+        })?;
+
+        let mut public_key = [0u8; 32];
+        public_key.copy_from_slice(verifying_key.as_bytes());
+
+        Ok(public_key)
+    }
 }
 
 /// PASERK ID generation for key identification
