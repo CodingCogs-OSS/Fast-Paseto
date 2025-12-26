@@ -1,6 +1,7 @@
 use crate::error::PasetoError;
 use base64::{Engine as _, engine::general_purpose};
 use ed25519_dalek::SigningKey;
+use p384::ecdsa::SigningKey as P384SigningKey;
 use rand::{RngCore, rngs::OsRng};
 
 /// Ed25519 key pair for v4.public tokens
@@ -10,6 +11,21 @@ pub struct Ed25519KeyPair {
     pub secret_key: [u8; 64],
     /// Ed25519 public key (32 bytes)
     pub public_key: [u8; 32],
+}
+
+/// P-384 key pair for v3.public tokens (NIST-compliant)
+///
+/// Contains the ECDSA P-384 key pair used for signing and verifying
+/// v3.public PASETO tokens. This provides NIST-compliant cryptography
+/// for regulated environments.
+#[derive(Debug, Clone)]
+pub struct P384KeyPair {
+    /// P-384 secret key (48 bytes scalar)
+    pub secret_key: [u8; 48],
+    /// P-384 public key (compressed, 49 bytes: 1 byte prefix + 48 bytes x-coordinate)
+    /// Or uncompressed (97 bytes: 1 byte prefix + 48 bytes x + 48 bytes y)
+    /// We store uncompressed for compatibility
+    pub public_key: [u8; 49],
 }
 
 /// Cryptographic key generation
@@ -66,6 +82,50 @@ impl KeyGenerator {
         Ed25519KeyPair {
             secret_key: signing_key.to_keypair_bytes(),
             public_key: verifying_key.to_bytes(),
+        }
+    }
+
+    /// Generate a P-384 key pair for v3.public tokens (NIST-compliant)
+    ///
+    /// Uses a cryptographically secure random number generator (OsRng)
+    /// to generate a valid ECDSA P-384 key pair suitable for v3.public PASETO tokens.
+    /// This provides NIST-compliant cryptography for regulated environments.
+    ///
+    /// # Returns
+    ///
+    /// A `P384KeyPair` containing:
+    /// - `secret_key`: 48-byte P-384 secret key (scalar)
+    /// - `public_key`: 49-byte P-384 public key (compressed point)
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use fast_paseto::KeyGenerator;
+    ///
+    /// let keypair = KeyGenerator::generate_p384_keypair();
+    /// assert_eq!(keypair.secret_key.len(), 48);
+    /// assert_eq!(keypair.public_key.len(), 49);
+    /// ```
+    pub fn generate_p384_keypair() -> P384KeyPair {
+        use p384::elliptic_curve::sec1::ToEncodedPoint;
+
+        let signing_key = P384SigningKey::random(&mut OsRng);
+        let verifying_key = signing_key.verifying_key();
+
+        // Get the secret key bytes (48 bytes for P-384)
+        let secret_bytes = signing_key.to_bytes();
+        let mut secret_key = [0u8; 48];
+        secret_key.copy_from_slice(&secret_bytes);
+
+        // Get the public key in compressed form (49 bytes: 1 prefix + 48 x-coordinate)
+        let public_point = verifying_key.to_encoded_point(true); // compressed
+        let public_bytes = public_point.as_bytes();
+        let mut public_key = [0u8; 49];
+        public_key.copy_from_slice(public_bytes);
+
+        P384KeyPair {
+            secret_key,
+            public_key,
         }
     }
 
@@ -365,6 +425,83 @@ mod tests {
         let encoded2 = KeyGenerator::key_to_base64(&key);
 
         assert_eq!(encoded1, encoded2);
+    }
+
+    // P-384 key generation tests
+    #[test]
+    fn test_generate_p384_keypair_length() {
+        let keypair = KeyGenerator::generate_p384_keypair();
+        assert_eq!(keypair.secret_key.len(), 48);
+        assert_eq!(keypair.public_key.len(), 49); // Compressed point
+    }
+
+    #[test]
+    fn test_generate_p384_keypair_randomness() {
+        // Generate multiple key pairs and ensure they're different
+        let keypair1 = KeyGenerator::generate_p384_keypair();
+        let keypair2 = KeyGenerator::generate_p384_keypair();
+        let keypair3 = KeyGenerator::generate_p384_keypair();
+
+        // It's extremely unlikely that three P-384 key pairs would be identical
+        assert_ne!(keypair1.secret_key, keypair2.secret_key);
+        assert_ne!(keypair2.secret_key, keypair3.secret_key);
+        assert_ne!(keypair1.secret_key, keypair3.secret_key);
+
+        assert_ne!(keypair1.public_key, keypair2.public_key);
+        assert_ne!(keypair2.public_key, keypair3.public_key);
+        assert_ne!(keypair1.public_key, keypair3.public_key);
+    }
+
+    #[test]
+    fn test_generate_p384_keypair_non_zero() {
+        // Ensure the keys aren't all zeros (extremely unlikely but good to check)
+        let keypair = KeyGenerator::generate_p384_keypair();
+        let all_zeros_48 = [0u8; 48];
+        let all_zeros_49 = [0u8; 49];
+        assert_ne!(keypair.secret_key, all_zeros_48);
+        assert_ne!(keypair.public_key, all_zeros_49);
+    }
+
+    #[test]
+    fn test_p384_keypair_validity() {
+        use p384::ecdsa::{
+            Signature, SigningKey as P384SigningKey, VerifyingKey as P384VerifyingKey,
+            signature::{Signer, Verifier},
+        };
+        use p384::elliptic_curve::sec1::FromEncodedPoint;
+        use p384::{EncodedPoint, PublicKey};
+
+        // Generate a key pair
+        let keypair = KeyGenerator::generate_p384_keypair();
+
+        // Reconstruct the signing key from the secret key bytes
+        let signing_key = P384SigningKey::from_bytes((&keypair.secret_key).into())
+            .expect("Generated secret key should be valid");
+
+        // Reconstruct the verifying key from the public key bytes (compressed point)
+        let encoded_point = EncodedPoint::from_bytes(&keypair.public_key)
+            .expect("Generated public key should be valid encoded point");
+        let public_key = PublicKey::from_encoded_point(&encoded_point)
+            .expect("Generated public key should be valid");
+        let verifying_key = P384VerifyingKey::from(&public_key);
+
+        // Verify that the public key from the signing key matches our stored public key
+        use p384::elliptic_curve::sec1::ToEncodedPoint;
+        let derived_public = signing_key.verifying_key().to_encoded_point(true);
+        assert_eq!(
+            derived_public.as_bytes(),
+            &keypair.public_key,
+            "Public key derived from secret key should match stored public key"
+        );
+
+        // Test signing and verification with a simple message
+        let message = b"test message for P-384 key pair validation";
+        let signature: Signature = signing_key.sign(message);
+
+        // Verification should succeed
+        verifying_key
+            .verify(message, &signature)
+            .expect("Signature verification should succeed with matching key pair");
     }
 
     // Property-based tests

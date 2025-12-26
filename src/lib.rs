@@ -13,7 +13,7 @@ pub mod version;
 
 pub use claims_manager::ClaimsManager;
 pub use error::PasetoError;
-pub use key_generator::{Ed25519KeyPair, KeyGenerator};
+pub use key_generator::{Ed25519KeyPair, KeyGenerator, P384KeyPair};
 pub use key_manager::{KeyManager, PaserkId, PaserkKey};
 pub use pae::Pae;
 pub use payload::TokenPayload;
@@ -1469,6 +1469,389 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
         Ok(PaserkId::generate_pid(&key_array))
     }
 
+    /// Wrap a symmetric key using a wrapping key (PASERK local-wrap)
+    ///
+    /// Encrypts a 32-byte symmetric key using another 32-byte wrapping key,
+    /// producing a PASERK wrapped key string. Uses v4.local token encryption
+    /// internally to provide authenticated encryption.
+    ///
+    /// Args:
+    ///     key: A 32-byte symmetric key to wrap (bytes)
+    ///     wrapping_key: A 32-byte wrapping key (bytes)
+    ///
+    /// Returns:
+    ///     str: A PASERK local-wrap key string (e.g., "k4.local-wrap.pie.AAAA...")
+    ///
+    /// Raises:
+    ///     PasetoKeyError: If either key is not exactly 32 bytes
+    ///     PasetoCryptoError: If encryption fails
+    ///
+    /// Example:
+    ///     >>> import fast_paseto
+    ///     >>> key = fast_paseto.generate_symmetric_key()
+    ///     >>> wrapping_key = fast_paseto.generate_symmetric_key()
+    ///     >>> wrapped = fast_paseto.local_wrap(key, wrapping_key)
+    ///     >>> wrapped.startswith("k4.local-wrap.pie.")
+    ///     True
+    #[pyfunction]
+    fn local_wrap(key: &[u8], wrapping_key: &[u8]) -> PyResult<String> {
+        if key.len() != 32 {
+            return Err(PasetoKeyError::new_err(format!(
+                "Invalid key length: expected 32 bytes, got {}",
+                key.len()
+            )));
+        }
+        if wrapping_key.len() != 32 {
+            return Err(PasetoKeyError::new_err(format!(
+                "Invalid wrapping key length: expected 32 bytes, got {}",
+                wrapping_key.len()
+            )));
+        }
+        let key_array: [u8; 32] = key
+            .try_into()
+            .map_err(|_| PasetoKeyError::new_err("Failed to convert key to array"))?;
+        let wrapping_key_array: [u8; 32] = wrapping_key
+            .try_into()
+            .map_err(|_| PasetoKeyError::new_err("Failed to convert wrapping key to array"))?;
+        Ok(KeyManager::local_wrap(&key_array, &wrapping_key_array)?)
+    }
+
+    /// Unwrap a symmetric key using a wrapping key (PASERK local-wrap)
+    ///
+    /// Decrypts a PASERK wrapped key string using a 32-byte wrapping key,
+    /// returning the original 32-byte symmetric key. Uses v4.local token
+    /// decryption internally to provide authenticated decryption.
+    ///
+    /// Args:
+    ///     wrapped_key: A PASERK local-wrap key string (str)
+    ///     wrapping_key: A 32-byte wrapping key (bytes)
+    ///
+    /// Returns:
+    ///     bytes: The unwrapped 32-byte symmetric key
+    ///
+    /// Raises:
+    ///     PasetoKeyError: If the wrapping key is not exactly 32 bytes or format is invalid
+    ///     PasetoCryptoError: If decryption fails (wrong key or tampered data)
+    ///
+    /// Example:
+    ///     >>> import fast_paseto
+    ///     >>> key = fast_paseto.generate_symmetric_key()
+    ///     >>> wrapping_key = fast_paseto.generate_symmetric_key()
+    ///     >>> wrapped = fast_paseto.local_wrap(key, wrapping_key)
+    ///     >>> unwrapped = fast_paseto.local_unwrap(wrapped, wrapping_key)
+    ///     >>> unwrapped == key
+    ///     True
+    #[pyfunction]
+    fn local_unwrap(
+        py: Python<'_>,
+        wrapped_key: &str,
+        wrapping_key: &[u8],
+    ) -> PyResult<Py<PyBytes>> {
+        if wrapping_key.len() != 32 {
+            return Err(PasetoKeyError::new_err(format!(
+                "Invalid wrapping key length: expected 32 bytes, got {}",
+                wrapping_key.len()
+            )));
+        }
+        let wrapping_key_array: [u8; 32] = wrapping_key
+            .try_into()
+            .map_err(|_| PasetoKeyError::new_err("Failed to convert wrapping key to array"))?;
+        let unwrapped = KeyManager::local_unwrap(wrapped_key, &wrapping_key_array)?;
+        Ok(PyBytes::new(py, &unwrapped).into())
+    }
+
+    /// Wrap an Ed25519 secret key with a wrapping key (PASERK secret-wrap).
+    ///
+    /// Encrypts a 64-byte Ed25519 secret key using a 32-byte wrapping key,
+    /// producing a PASERK wrapped key string. Uses v4.local token encryption
+    /// internally to provide authenticated encryption.
+    ///
+    /// Args:
+    ///     secret_key: 64-byte Ed25519 secret key to wrap
+    ///     wrapping_key: 32-byte wrapping key
+    ///
+    /// Returns:
+    ///     PASERK secret-wrap key string (format: k4.secret-wrap.pie.{wrapped_token})
+    ///
+    /// Raises:
+    ///     PasetoKeyError: If key lengths are invalid
+    ///     PasetoCryptoError: If encryption fails
+    ///
+    /// Example:
+    ///     >>> keypair = fast_paseto.generate_keypair()
+    ///     >>> wrapping_key = fast_paseto.generate_symmetric_key()
+    ///     >>> wrapped = fast_paseto.secret_wrap(keypair['secret_key'], wrapping_key)
+    ///     >>> wrapped.startswith("k4.secret-wrap.pie.")
+    ///     True
+    #[pyfunction]
+    fn secret_wrap(secret_key: &[u8], wrapping_key: &[u8]) -> PyResult<String> {
+        if secret_key.len() != 64 {
+            return Err(PasetoKeyError::new_err(format!(
+                "Invalid secret key length: expected 64 bytes, got {}",
+                secret_key.len()
+            )));
+        }
+        if wrapping_key.len() != 32 {
+            return Err(PasetoKeyError::new_err(format!(
+                "Invalid wrapping key length: expected 32 bytes, got {}",
+                wrapping_key.len()
+            )));
+        }
+        let secret_key_array: [u8; 64] = secret_key
+            .try_into()
+            .map_err(|_| PasetoKeyError::new_err("Failed to convert secret key to array"))?;
+        let wrapping_key_array: [u8; 32] = wrapping_key
+            .try_into()
+            .map_err(|_| PasetoKeyError::new_err("Failed to convert wrapping key to array"))?;
+        Ok(KeyManager::secret_wrap(
+            &secret_key_array,
+            &wrapping_key_array,
+        )?)
+    }
+
+    /// Unwrap an Ed25519 secret key with a wrapping key (PASERK secret-wrap).
+    ///
+    /// Decrypts a PASERK wrapped key string using a 32-byte wrapping key,
+    /// returning the original 64-byte Ed25519 secret key. Uses v4.local token
+    /// decryption internally to provide authenticated decryption.
+    ///
+    /// Args:
+    ///     wrapped_key: PASERK secret-wrap key string
+    ///     wrapping_key: 32-byte wrapping key
+    ///
+    /// Returns:
+    ///     Unwrapped 64-byte Ed25519 secret key
+    ///
+    /// Raises:
+    ///     PasetoKeyError: If wrapping key length is invalid
+    ///     PasetoFormatError: If wrapped key format is invalid
+    ///     PasetoAuthenticationError: If decryption fails
+    ///
+    /// Example:
+    ///     >>> keypair = fast_paseto.generate_keypair()
+    ///     >>> wrapping_key = fast_paseto.generate_symmetric_key()
+    ///     >>> wrapped = fast_paseto.secret_wrap(keypair['secret_key'], wrapping_key)
+    ///     >>> unwrapped = fast_paseto.secret_unwrap(wrapped, wrapping_key)
+    ///     >>> unwrapped == keypair['secret_key']
+    ///     True
+    #[pyfunction]
+    fn secret_unwrap(
+        py: Python<'_>,
+        wrapped_key: &str,
+        wrapping_key: &[u8],
+    ) -> PyResult<Py<PyBytes>> {
+        if wrapping_key.len() != 32 {
+            return Err(PasetoKeyError::new_err(format!(
+                "Invalid wrapping key length: expected 32 bytes, got {}",
+                wrapping_key.len()
+            )));
+        }
+        let wrapping_key_array: [u8; 32] = wrapping_key
+            .try_into()
+            .map_err(|_| PasetoKeyError::new_err("Failed to convert wrapping key to array"))?;
+        let unwrapped = KeyManager::secret_unwrap(wrapped_key, &wrapping_key_array)?;
+        Ok(PyBytes::new(py, &unwrapped).into())
+    }
+
+    /// Encrypt a symmetric key with a password (PASERK local-pw)
+    ///
+    /// Uses Argon2id for key derivation and v4.local encryption.
+    /// Format: `k4.local-pw.{base64url_encrypted_data}`
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - 32-byte symmetric key to encrypt
+    /// * `password` - Password string
+    ///
+    /// # Returns
+    ///
+    /// A PASERK local-pw encrypted key string
+    ///
+    /// # Raises
+    ///
+    /// * `PasetoKeyError` - If key length is not 32 bytes
+    /// * `PasetoCryptoError` - If encryption fails
+    ///
+    /// # Examples
+    ///
+    ///     >>> import fast_paseto
+    ///     >>> key = fast_paseto.generate_symmetric_key()
+    ///     >>> encrypted = fast_paseto.local_pw_encrypt(key, "my-password")
+    ///     >>> encrypted.startswith("k4.local-pw.")
+    ///     True
+    #[pyfunction]
+    fn local_pw_encrypt(key: &[u8], password: &str) -> PyResult<String> {
+        if key.len() != 32 {
+            return Err(PasetoKeyError::new_err(format!(
+                "Invalid key length: expected 32 bytes, got {}",
+                key.len()
+            )));
+        }
+        let key_array: [u8; 32] = key
+            .try_into()
+            .map_err(|_| PasetoKeyError::new_err("Failed to convert key to array"))?;
+        let encrypted = KeyManager::local_pw_encrypt(&key_array, password)?;
+        Ok(encrypted)
+    }
+
+    /// Decrypt a symmetric key with a password (PASERK local-pw)
+    ///
+    /// # Arguments
+    ///
+    /// * `encrypted` - PASERK local-pw encrypted key string
+    /// * `password` - Password string
+    ///
+    /// # Returns
+    ///
+    /// The decrypted 32-byte symmetric key
+    ///
+    /// # Raises
+    ///
+    /// * `PasetoValidationError` - If format is invalid
+    /// * `PasetoCryptoError` - If decryption fails (wrong password)
+    ///
+    /// # Examples
+    ///
+    ///     >>> import fast_paseto
+    ///     >>> key = fast_paseto.generate_symmetric_key()
+    ///     >>> encrypted = fast_paseto.local_pw_encrypt(key, "my-password")
+    ///     >>> decrypted = fast_paseto.local_pw_decrypt(encrypted, "my-password")
+    ///     >>> decrypted == key
+    ///     True
+    #[pyfunction]
+    fn local_pw_decrypt(py: Python<'_>, encrypted: &str, password: &str) -> PyResult<Py<PyBytes>> {
+        let decrypted = KeyManager::local_pw_decrypt(encrypted, password)?;
+        Ok(PyBytes::new(py, &decrypted).into())
+    }
+
+    /// Encrypt an Ed25519 secret key with a password (PASERK secret-pw)
+    ///
+    /// Uses Argon2id for key derivation and v4.local encryption.
+    /// Format: `k4.secret-pw.{base64url_encrypted_data}`
+    ///
+    /// # Arguments
+    ///
+    /// * `secret_key` - 64-byte Ed25519 secret key to encrypt
+    /// * `password` - Password string
+    ///
+    /// # Returns
+    ///
+    /// A PASERK secret-pw encrypted key string
+    ///
+    /// # Raises
+    ///
+    /// * `PasetoKeyError` - If key length is not 64 bytes
+    /// * `PasetoCryptoError` - If encryption fails
+    ///
+    /// # Examples
+    ///
+    ///     >>> import fast_paseto
+    ///     >>> secret_key, public_key = fast_paseto.generate_keypair()
+    ///     >>> encrypted = fast_paseto.secret_pw_encrypt(secret_key, "my-password")
+    ///     >>> encrypted.startswith("k4.secret-pw.")
+    ///     True
+    #[pyfunction]
+    fn secret_pw_encrypt(secret_key: &[u8], password: &str) -> PyResult<String> {
+        if secret_key.len() != 64 {
+            return Err(PasetoKeyError::new_err(format!(
+                "Invalid secret key length: expected 64 bytes, got {}",
+                secret_key.len()
+            )));
+        }
+        let key_array: [u8; 64] = secret_key
+            .try_into()
+            .map_err(|_| PasetoKeyError::new_err("Failed to convert secret key to array"))?;
+        let encrypted = KeyManager::secret_pw_encrypt(&key_array, password)?;
+        Ok(encrypted)
+    }
+
+    /// Decrypt an Ed25519 secret key with a password (PASERK secret-pw)
+    ///
+    /// # Arguments
+    ///
+    /// * `encrypted` - PASERK secret-pw encrypted key string
+    /// * `password` - Password string
+    ///
+    /// # Returns
+    ///
+    /// The decrypted 64-byte Ed25519 secret key
+    ///
+    /// # Raises
+    ///
+    /// * `PasetoValidationError` - If format is invalid
+    /// * `PasetoCryptoError` - If decryption fails (wrong password)
+    ///
+    /// # Examples
+    ///
+    ///     >>> import fast_paseto
+    ///     >>> secret_key, public_key = fast_paseto.generate_keypair()
+    ///     >>> encrypted = fast_paseto.secret_pw_encrypt(secret_key, "my-password")
+    ///     >>> decrypted = fast_paseto.secret_pw_decrypt(encrypted, "my-password")
+    ///     >>> decrypted == secret_key
+    ///     True
+    #[pyfunction]
+    fn secret_pw_decrypt(py: Python<'_>, encrypted: &str, password: &str) -> PyResult<Py<PyBytes>> {
+        let decrypted = KeyManager::secret_pw_decrypt(encrypted, password)?;
+        Ok(PyBytes::new(py, &decrypted).into())
+    }
+
+    /// Load an Ed25519 private key from PEM format (PKCS#8)
+    ///
+    /// Parses a PEM-encoded Ed25519 private key in PKCS#8 format and returns
+    /// the 64-byte secret key suitable for use with v4.public tokens.
+    ///
+    /// Args:
+    ///     pem: PEM-encoded Ed25519 private key string
+    ///
+    /// Returns:
+    ///     bytes: A 64-byte Ed25519 secret key
+    ///
+    /// Raises:
+    ///     PasetoKeyError: If the PEM format is invalid or the key is not Ed25519
+    ///
+    /// Example:
+    ///     >>> import fast_paseto
+    ///     >>> pem = '''-----BEGIN PRIVATE KEY-----
+    ///     ... MC4CAQAwBQYDK2VwBCIEIGqPaUKpqt0MJjJgXgXgXgXgXgXgXgXgXgXgXgXgXgXg
+    ///     ... -----END PRIVATE KEY-----'''
+    ///     >>> secret_key = fast_paseto.ed25519_from_pem(pem)
+    ///     >>> len(secret_key)
+    ///     64
+    #[pyfunction]
+    fn ed25519_from_pem(py: Python<'_>, pem: &str) -> PyResult<Py<PyBytes>> {
+        let secret_key = KeyManager::ed25519_from_pem(pem)?;
+        Ok(PyBytes::new(py, &secret_key).into())
+    }
+
+    /// Load an Ed25519 public key from PEM format (SPKI)
+    ///
+    /// Parses a PEM-encoded Ed25519 public key in SPKI (Subject Public Key Info)
+    /// format and returns the 32-byte public key suitable for use with v4.public
+    /// token verification.
+    ///
+    /// Args:
+    ///     pem: PEM-encoded Ed25519 public key string
+    ///
+    /// Returns:
+    ///     bytes: A 32-byte Ed25519 public key
+    ///
+    /// Raises:
+    ///     PasetoKeyError: If the PEM format is invalid or the key is not Ed25519
+    ///
+    /// Example:
+    ///     >>> import fast_paseto
+    ///     >>> pem = '''-----BEGIN PUBLIC KEY-----
+    ///     ... MCowBQYDK2VwAyEAGb9F2CMCwPz0vPz0vPz0vPz0vPz0vPz0vPz0vPz0vPw=
+    ///     ... -----END PUBLIC KEY-----'''
+    ///     >>> public_key = fast_paseto.ed25519_public_from_pem(pem)
+    ///     >>> len(public_key)
+    ///     32
+    #[pyfunction]
+    fn ed25519_public_from_pem(py: Python<'_>, pem: &str) -> PyResult<Py<PyBytes>> {
+        let public_key = KeyManager::ed25519_public_from_pem(pem)?;
+        Ok(PyBytes::new(py, &public_key).into())
+    }
+
     m.add_function(wrap_pyfunction!(generate_symmetric_key, m)?)?;
     m.add_function(wrap_pyfunction!(generate_keypair, m)?)?;
     m.add_function(wrap_pyfunction!(encode, m)?)?;
@@ -1480,6 +1863,16 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(generate_lid, m)?)?;
     m.add_function(wrap_pyfunction!(generate_sid, m)?)?;
     m.add_function(wrap_pyfunction!(generate_pid, m)?)?;
+    m.add_function(wrap_pyfunction!(local_wrap, m)?)?;
+    m.add_function(wrap_pyfunction!(local_unwrap, m)?)?;
+    m.add_function(wrap_pyfunction!(secret_wrap, m)?)?;
+    m.add_function(wrap_pyfunction!(secret_unwrap, m)?)?;
+    m.add_function(wrap_pyfunction!(local_pw_encrypt, m)?)?;
+    m.add_function(wrap_pyfunction!(local_pw_decrypt, m)?)?;
+    m.add_function(wrap_pyfunction!(secret_pw_encrypt, m)?)?;
+    m.add_function(wrap_pyfunction!(secret_pw_decrypt, m)?)?;
+    m.add_function(wrap_pyfunction!(ed25519_from_pem, m)?)?;
+    m.add_function(wrap_pyfunction!(ed25519_public_from_pem, m)?)?;
 
     Ok(())
 }

@@ -313,3 +313,239 @@ def from_paserk(paserk: str) -> tuple[str, bytes]:
         PasetoKeyError: If the PASERK format is invalid or unsupported
     """
     ...
+
+def generate_lid(key: bytes) -> str:
+    """Generate a PASERK local ID (lid) for a symmetric key.
+
+    Creates a deterministic identifier for a 32-byte symmetric key using BLAKE2b-256.
+    The same key always produces the same ID.
+
+    Args:
+        key: A 32-byte symmetric key
+
+    Returns:
+        str: A PASERK local ID string (format: k4.lid.{base64url_hash})
+
+    Raises:
+        PasetoKeyError: If the key is not exactly 32 bytes
+    """
+    ...
+
+def generate_sid(key: bytes) -> str:
+    """Generate a PASERK secret ID (sid) for an Ed25519 secret key.
+
+    Creates a deterministic identifier for a 64-byte Ed25519 secret key using BLAKE2b-256.
+    The same key always produces the same ID.
+
+    Args:
+        key: A 64-byte Ed25519 secret key
+
+    Returns:
+        str: A PASERK secret ID string (format: k4.sid.{base64url_hash})
+
+    Raises:
+        PasetoKeyError: If the key is not exactly 64 bytes
+    """
+    ...
+
+def generate_pid(key: bytes) -> str:
+    """Generate a PASERK public ID (pid) for an Ed25519 public key.
+
+    Creates a deterministic identifier for a 32-byte Ed25519 public key using BLAKE2b-256.
+    The same key always produces the same ID.
+
+    Args:
+        key: A 32-byte Ed25519 public key
+
+    Returns:
+        str: A PASERK public ID string (format: k4.pid.{base64url_hash})
+
+    Raises:
+        PasetoKeyError: If the key is not exactly 32 bytes
+    """
+    ...
+
+def local_wrap(key: bytes, wrapping_key: bytes) -> str:
+    """Wrap a symmetric key with a wrapping key (PASERK local-wrap).
+
+    Encrypts a 32-byte symmetric key using another 32-byte wrapping key,
+    producing a PASERK wrapped key string. Uses v4.local token encryption
+    internally to provide authenticated encryption.
+
+    Args:
+        key: A 32-byte symmetric key to wrap
+        wrapping_key: A 32-byte wrapping key
+
+    Returns:
+        str: A PASERK local-wrap key string (format: k4.local-wrap.pie.{wrapped_token})
+
+    Raises:
+        PasetoKeyError: If either key is not exactly 32 bytes
+        PasetoCryptoError: If encryption fails
+    """
+    ...
+
+def local_unwrap(wrapped_key: str, wrapping_key: bytes) -> bytes:
+    """Unwrap a symmetric key with a wrapping key (PASERK local-wrap).
+
+    Decrypts a PASERK wrapped key string using a 32-byte wrapping key,
+    returning the original 32-byte symmetric key.
+
+    Args:
+        wrapped_key: A PASERK local-wrap key string
+        wrapping_key: A 32-byte wrapping key
+
+    Returns:
+        bytes: The unwrapped 32-byte symmetric key
+
+    Raises:
+        PasetoKeyError: If the wrapping key is not exactly 32 bytes
+        PasetoValidationError: If the wrapped key format is invalid
+        PasetoCryptoError: If decryption fails
+    """
+    ...
+
+def secret_wrap(secret_key: bytes, wrapping_key: bytes) -> str:
+    """Wrap an Ed25519 secret key with a wrapping key (PASERK secret-wrap).
+
+    Encrypts a 64-byte Ed25519 secret key using a 32-byte wrapping key,
+    producing a PASERK wrapped key string. Uses v4.local token encryption
+    internally to provide authenticated encryption.
+
+    Args:
+        secret_key: A 64-byte Ed25519 secret key to wrap
+        wrapping_key: A 32-byte wrapping key
+
+    Returns:
+        str: A PASERK secret-wrap key string (format: k4.secret-wrap.pie.{wrapped_token})
+
+    Raises:
+        PasetoKeyError: If secret_key is not 64 bytes or wrapping_key is not 32 bytes
+        PasetoCryptoError: If encryption fails
+    """
+    ...
+
+def secret_unwrap(wrapped_key: str, wrapping_key: bytes) -> bytes:
+    """Unwrap an Ed25519 secret key with a wrapping key (PASERK secret-wrap).
+
+    Decrypts a PASERK wrapped key string using a 32-byte wrapping key,
+    returning the original 64-byte Ed25519 secret key.
+
+    Args:
+        wrapped_key: A PASERK secret-wrap key string
+        wrapping_key: A 32-byte wrapping key
+
+    Returns:
+        bytes: The unwrapped 64-byte Ed25519 secret key
+
+    Raises:
+        PasetoKeyError: If the wrapping key is not exactly 32 bytes
+        PasetoValidationError: If the wrapped key format is invalid
+        PasetoCryptoError: If decryption fails
+    """
+    ...
+
+def local_pw_encrypt(key: bytes, password: str) -> str:
+    """Encrypt a symmetric key with a password (PASERK local-pw).
+
+    Uses Argon2id for key derivation and v4.local encryption.
+    Format: k4.local-pw.{base64url_encrypted_data}
+
+    Args:
+        key: A 32-byte symmetric key to encrypt
+        password: Password string
+
+    Returns:
+        str: A PASERK local-pw encrypted key string
+
+    Raises:
+        PasetoKeyError: If the key is not exactly 32 bytes
+        PasetoCryptoError: If encryption fails
+    """
+    ...
+
+def local_pw_decrypt(encrypted: str, password: str) -> bytes:
+    """Decrypt a symmetric key with a password (PASERK local-pw).
+
+    Args:
+        encrypted: A PASERK local-pw encrypted key string
+        password: Password string
+
+    Returns:
+        bytes: The decrypted 32-byte symmetric key
+
+    Raises:
+        PasetoValidationError: If the format is invalid
+        PasetoCryptoError: If decryption fails (wrong password)
+    """
+    ...
+
+def secret_pw_encrypt(secret_key: bytes, password: str) -> str:
+    """Encrypt an Ed25519 secret key with a password (PASERK secret-pw).
+
+    Uses Argon2id for key derivation and v4.local encryption.
+    Format: k4.secret-pw.{base64url_encrypted_data}
+
+    Args:
+        secret_key: A 64-byte Ed25519 secret key to encrypt
+        password: Password string
+
+    Returns:
+        str: A PASERK secret-pw encrypted key string
+
+    Raises:
+        PasetoKeyError: If the key is not exactly 64 bytes
+        PasetoCryptoError: If encryption fails
+    """
+    ...
+
+def secret_pw_decrypt(encrypted: str, password: str) -> bytes:
+    """Decrypt an Ed25519 secret key with a password (PASERK secret-pw).
+
+    Args:
+        encrypted: A PASERK secret-pw encrypted key string
+        password: Password string
+
+    Returns:
+        bytes: The decrypted 64-byte Ed25519 secret key
+
+    Raises:
+        PasetoValidationError: If the format is invalid
+        PasetoCryptoError: If decryption fails (wrong password)
+    """
+    ...
+
+def ed25519_from_pem(pem: str) -> bytes:
+    """Load an Ed25519 private key from PEM format (PKCS#8).
+
+    Parses a PEM-encoded Ed25519 private key in PKCS#8 format and returns
+    the 64-byte secret key suitable for use with v4.public tokens.
+
+    Args:
+        pem: PEM-encoded Ed25519 private key string
+
+    Returns:
+        bytes: A 64-byte Ed25519 secret key
+
+    Raises:
+        PasetoKeyError: If the PEM format is invalid or the key is not Ed25519
+    """
+    ...
+
+def ed25519_public_from_pem(pem: str) -> bytes:
+    """Load an Ed25519 public key from PEM format (SPKI).
+
+    Parses a PEM-encoded Ed25519 public key in SPKI (Subject Public Key Info)
+    format and returns the 32-byte public key suitable for use with v4.public
+    token verification.
+
+    Args:
+        pem: PEM-encoded Ed25519 public key string
+
+    Returns:
+        bytes: A 32-byte Ed25519 public key
+
+    Raises:
+        PasetoKeyError: If the PEM format is invalid or the key is not Ed25519
+    """
+    ...

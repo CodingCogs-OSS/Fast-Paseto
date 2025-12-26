@@ -1,4 +1,6 @@
 use crate::error::PasetoError;
+use crate::token_generator::TokenGenerator;
+use crate::token_verifier::TokenVerifier;
 use base64::prelude::*;
 use blake2::{Blake2b512, Digest};
 
@@ -17,6 +19,687 @@ pub enum PaserkKey {
 pub struct KeyManager;
 
 impl KeyManager {
+    /// Wrap a symmetric key using a wrapping key (PASERK local-wrap)
+    ///
+    /// Encrypts a 32-byte symmetric key using another 32-byte wrapping key,
+    /// producing a PASERK wrapped key string. Uses v4.local token encryption
+    /// internally to provide authenticated encryption.
+    ///
+    /// Format: `k4.local-wrap.pie.{base64url_wrapped_token}`
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - 32-byte symmetric key to wrap
+    /// * `wrapping_key` - 32-byte wrapping key
+    ///
+    /// # Returns
+    ///
+    /// A PASERK local-wrap key string
+    ///
+    /// # Errors
+    ///
+    /// Returns `PasetoError::CryptoError` if encryption fails
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use fast_paseto::KeyManager;
+    /// use fast_paseto::KeyGenerator;
+    ///
+    /// let key = KeyGenerator::generate_symmetric_key();
+    /// let wrapping_key = KeyGenerator::generate_symmetric_key();
+    /// let wrapped = KeyManager::local_wrap(&key, &wrapping_key).unwrap();
+    /// assert!(wrapped.starts_with("k4.local-wrap.pie."));
+    /// ```
+    pub fn local_wrap(key: &[u8; 32], wrapping_key: &[u8; 32]) -> Result<String, PasetoError> {
+        use crate::token_generator::TokenGenerator;
+
+        // Use v4.local encryption to wrap the key
+        // The key bytes become the payload
+        let wrapped_token = TokenGenerator::v4_local_encrypt(
+            wrapping_key,
+            key,
+            None, // No footer
+            None, // No implicit assertion
+        )?;
+
+        // Extract the payload part (everything after "v4.local.")
+        // Format: v4.local.{base64url_payload}
+        let parts: Vec<&str> = wrapped_token.split('.').collect();
+        if parts.len() < 3 {
+            return Err(PasetoError::CryptoError(
+                "Invalid wrapped token format".to_string(),
+            ));
+        }
+
+        // Build PASERK local-wrap format: k4.local-wrap.pie.{base64url_payload}
+        Ok(format!("k4.local-wrap.pie.{}", parts[2]))
+    }
+
+    /// Unwrap a symmetric key using a wrapping key (PASERK local-wrap)
+    ///
+    /// Decrypts a PASERK wrapped key string using a 32-byte wrapping key,
+    /// returning the original 32-byte symmetric key. Uses v4.local token
+    /// decryption internally to provide authenticated decryption.
+    ///
+    /// Format: `k4.local-wrap.pie.{base64url_wrapped_token}`
+    ///
+    /// # Arguments
+    ///
+    /// * `wrapped_key` - PASERK local-wrap key string
+    /// * `wrapping_key` - 32-byte wrapping key
+    ///
+    /// # Returns
+    ///
+    /// The unwrapped 32-byte symmetric key
+    ///
+    /// # Errors
+    ///
+    /// Returns `PasetoError::InvalidPaserkFormat` if the format is invalid
+    /// Returns `PasetoError::AuthenticationFailed` if decryption fails
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use fast_paseto::KeyManager;
+    /// use fast_paseto::KeyGenerator;
+    ///
+    /// let key = KeyGenerator::generate_symmetric_key();
+    /// let wrapping_key = KeyGenerator::generate_symmetric_key();
+    /// let wrapped = KeyManager::local_wrap(&key, &wrapping_key).unwrap();
+    /// let unwrapped = KeyManager::local_unwrap(&wrapped, &wrapping_key).unwrap();
+    /// assert_eq!(key, unwrapped);
+    /// ```
+    pub fn local_unwrap(
+        wrapped_key: &str,
+        wrapping_key: &[u8; 32],
+    ) -> Result<[u8; 32], PasetoError> {
+        use crate::token_verifier::TokenVerifier;
+
+        // Parse PASERK local-wrap format: k4.local-wrap.pie.{base64url_payload}
+        let parts: Vec<&str> = wrapped_key.split('.').collect();
+
+        if parts.len() != 4 {
+            return Err(PasetoError::InvalidPaserkFormat(
+                "PASERK local-wrap must have exactly 4 parts separated by dots".to_string(),
+            ));
+        }
+
+        if parts[0] != "k4" {
+            return Err(PasetoError::InvalidPaserkFormat(format!(
+                "Unsupported PASERK version: {}",
+                parts[0]
+            )));
+        }
+
+        if parts[1] != "local-wrap" {
+            return Err(PasetoError::InvalidPaserkFormat(format!(
+                "Expected 'local-wrap', got '{}'",
+                parts[1]
+            )));
+        }
+
+        if parts[2] != "pie" {
+            return Err(PasetoError::InvalidPaserkFormat(format!(
+                "Expected 'pie', got '{}'",
+                parts[2]
+            )));
+        }
+
+        // Reconstruct v4.local token from the payload part
+        let token = format!("v4.local.{}", parts[3]);
+
+        // Use v4.local decryption to unwrap the key
+        let verifier = TokenVerifier::new(None);
+        let key_bytes = verifier.v4_local_decrypt(
+            &token,
+            wrapping_key,
+            None, // No footer
+            None, // No implicit assertion
+        )?;
+
+        // Validate key length
+        if key_bytes.len() != 32 {
+            return Err(PasetoError::InvalidPaserkFormat(format!(
+                "Unwrapped key must be 32 bytes, got {}",
+                key_bytes.len()
+            )));
+        }
+
+        let mut key = [0u8; 32];
+        key.copy_from_slice(&key_bytes);
+        Ok(key)
+    }
+
+    /// Wrap an Ed25519 secret key using a wrapping key (PASERK secret-wrap)
+    ///
+    /// Encrypts a 64-byte Ed25519 secret key using a 32-byte wrapping key,
+    /// producing a PASERK wrapped key string. Uses v4.local token encryption
+    /// internally to provide authenticated encryption.
+    ///
+    /// Format: `k4.secret-wrap.pie.{base64url_wrapped_token}`
+    ///
+    /// # Arguments
+    ///
+    /// * `secret_key` - 64-byte Ed25519 secret key to wrap
+    /// * `wrapping_key` - 32-byte wrapping key
+    ///
+    /// # Returns
+    ///
+    /// A PASERK secret-wrap key string
+    ///
+    /// # Errors
+    ///
+    /// Returns `PasetoError::CryptoError` if encryption fails
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use fast_paseto::KeyManager;
+    /// use fast_paseto::KeyGenerator;
+    ///
+    /// let keypair = KeyGenerator::generate_ed25519_keypair();
+    /// let wrapping_key = KeyGenerator::generate_symmetric_key();
+    /// let wrapped = KeyManager::secret_wrap(&keypair.secret_key, &wrapping_key).unwrap();
+    /// assert!(wrapped.starts_with("k4.secret-wrap.pie."));
+    /// ```
+    pub fn secret_wrap(
+        secret_key: &[u8; 64],
+        wrapping_key: &[u8; 32],
+    ) -> Result<String, PasetoError> {
+        // Use v4.local encryption to wrap the secret key
+        // The secret key bytes become the payload
+        let wrapped_token = TokenGenerator::v4_local_encrypt(
+            wrapping_key,
+            secret_key,
+            None, // No footer
+            None, // No implicit assertion
+        )?;
+
+        // Extract the payload part (everything after "v4.local.")
+        // Format: v4.local.{base64url_payload}
+        let parts: Vec<&str> = wrapped_token.split('.').collect();
+        if parts.len() < 3 {
+            return Err(PasetoError::CryptoError(
+                "Invalid wrapped token format".to_string(),
+            ));
+        }
+
+        // Build PASERK secret-wrap format: k4.secret-wrap.pie.{base64url_payload}
+        Ok(format!("k4.secret-wrap.pie.{}", parts[2]))
+    }
+
+    /// Unwrap an Ed25519 secret key using a wrapping key (PASERK secret-wrap)
+    ///
+    /// Decrypts a PASERK wrapped key string using a 32-byte wrapping key,
+    /// returning the original 64-byte Ed25519 secret key. Uses v4.local token
+    /// decryption internally to provide authenticated decryption.
+    ///
+    /// Format: `k4.secret-wrap.pie.{base64url_wrapped_token}`
+    ///
+    /// # Arguments
+    ///
+    /// * `wrapped_key` - PASERK secret-wrap key string
+    /// * `wrapping_key` - 32-byte wrapping key
+    ///
+    /// # Returns
+    ///
+    /// The unwrapped 64-byte Ed25519 secret key
+    ///
+    /// # Errors
+    ///
+    /// Returns `PasetoError::InvalidPaserkFormat` if the format is invalid
+    /// Returns `PasetoError::AuthenticationFailed` if decryption fails
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use fast_paseto::KeyManager;
+    /// use fast_paseto::KeyGenerator;
+    ///
+    /// let keypair = KeyGenerator::generate_ed25519_keypair();
+    /// let wrapping_key = KeyGenerator::generate_symmetric_key();
+    /// let wrapped = KeyManager::secret_wrap(&keypair.secret_key, &wrapping_key).unwrap();
+    /// let unwrapped = KeyManager::secret_unwrap(&wrapped, &wrapping_key).unwrap();
+    /// assert_eq!(keypair.secret_key, unwrapped);
+    /// ```
+    pub fn secret_unwrap(
+        wrapped_key: &str,
+        wrapping_key: &[u8; 32],
+    ) -> Result<[u8; 64], PasetoError> {
+        // Parse PASERK secret-wrap format: k4.secret-wrap.pie.{base64url_payload}
+        let parts: Vec<&str> = wrapped_key.split('.').collect();
+
+        if parts.len() != 4 {
+            return Err(PasetoError::InvalidPaserkFormat(
+                "PASERK secret-wrap must have exactly 4 parts separated by dots".to_string(),
+            ));
+        }
+
+        if parts[0] != "k4" {
+            return Err(PasetoError::InvalidPaserkFormat(format!(
+                "Unsupported PASERK version: {}",
+                parts[0]
+            )));
+        }
+
+        if parts[1] != "secret-wrap" {
+            return Err(PasetoError::InvalidPaserkFormat(format!(
+                "Expected 'secret-wrap', got '{}'",
+                parts[1]
+            )));
+        }
+
+        if parts[2] != "pie" {
+            return Err(PasetoError::InvalidPaserkFormat(format!(
+                "Expected 'pie', got '{}'",
+                parts[2]
+            )));
+        }
+
+        // Reconstruct v4.local token from the payload part
+        let token = format!("v4.local.{}", parts[3]);
+
+        // Use v4.local decryption to unwrap the key
+        let verifier = TokenVerifier::new(None);
+        let key_bytes = verifier.v4_local_decrypt(
+            &token,
+            wrapping_key,
+            None, // No footer
+            None, // No implicit assertion
+        )?;
+
+        // Validate key length
+        if key_bytes.len() != 64 {
+            return Err(PasetoError::InvalidPaserkFormat(format!(
+                "Unwrapped secret key must be 64 bytes, got {}",
+                key_bytes.len()
+            )));
+        }
+
+        let mut key = [0u8; 64];
+        key.copy_from_slice(&key_bytes);
+        Ok(key)
+    }
+
+    /// Encrypt a symmetric key with a password (PASERK local-pw)
+    ///
+    /// Uses Argon2id for key derivation and v4.local encryption.
+    /// Format: `k4.local-pw.{base64url_encrypted_data}`
+    ///
+    /// The encrypted data contains:
+    /// - Salt (16 bytes) for Argon2id
+    /// - Encrypted payload from v4.local encryption
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - 32-byte symmetric key to encrypt
+    /// * `password` - Password string
+    ///
+    /// # Returns
+    ///
+    /// A PASERK local-pw encrypted key string
+    ///
+    /// # Errors
+    ///
+    /// Returns `PasetoError::CryptoError` if encryption fails
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use fast_paseto::KeyManager;
+    /// use fast_paseto::KeyGenerator;
+    ///
+    /// let key = KeyGenerator::generate_symmetric_key();
+    /// let password = "secure-password-123";
+    /// let encrypted = KeyManager::local_pw_encrypt(&key, password).unwrap();
+    /// assert!(encrypted.starts_with("k4.local-pw."));
+    /// ```
+    pub fn local_pw_encrypt(key: &[u8; 32], password: &str) -> Result<String, PasetoError> {
+        use argon2::{Algorithm, Argon2, Params, Version};
+        use rand::Rng;
+
+        // Generate random salt (16 bytes)
+        let mut salt = [0u8; 16];
+        rand::thread_rng().fill(&mut salt);
+
+        // Derive encryption key using Argon2id
+        // PASERK recommends: m=64MB (65536 KB), t=2 iterations, p=1 parallelism
+        let params = Params::new(65536, 2, 1, Some(32))
+            .map_err(|e| PasetoError::CryptoError(format!("Argon2 params error: {}", e)))?;
+        let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
+
+        let mut derived_key = [0u8; 32];
+        argon2
+            .hash_password_into(password.as_bytes(), &salt, &mut derived_key)
+            .map_err(|e| PasetoError::CryptoError(format!("Argon2 error: {}", e)))?;
+
+        // Encrypt the key using v4.local encryption
+        let wrapped_token = TokenGenerator::v4_local_encrypt(
+            &derived_key,
+            key,
+            None, // No footer
+            None, // No implicit assertion
+        )?;
+
+        // Extract payload from token (after "v4.local.")
+        let parts: Vec<&str> = wrapped_token.split('.').collect();
+        if parts.len() < 3 {
+            return Err(PasetoError::CryptoError(
+                "Invalid wrapped token format".to_string(),
+            ));
+        }
+
+        // Combine salt + encrypted payload
+        let encrypted_payload = BASE64_URL_SAFE_NO_PAD
+            .decode(parts[2])
+            .map_err(|e| PasetoError::CryptoError(format!("Base64 decode error: {}", e)))?;
+
+        let mut combined = Vec::with_capacity(16 + encrypted_payload.len());
+        combined.extend_from_slice(&salt);
+        combined.extend_from_slice(&encrypted_payload);
+
+        let encoded = BASE64_URL_SAFE_NO_PAD.encode(&combined);
+        Ok(format!("k4.local-pw.{}", encoded))
+    }
+
+    /// Decrypt a symmetric key with a password (PASERK local-pw)
+    ///
+    /// Decrypts a PASERK local-pw encrypted key string using a password,
+    /// returning the original 32-byte symmetric key.
+    ///
+    /// # Arguments
+    ///
+    /// * `encrypted` - PASERK local-pw encrypted key string
+    /// * `password` - Password string
+    ///
+    /// # Returns
+    ///
+    /// The decrypted 32-byte symmetric key
+    ///
+    /// # Errors
+    ///
+    /// Returns `PasetoError::InvalidPaserkFormat` if the format is invalid
+    /// Returns `PasetoError::AuthenticationFailed` if decryption fails (wrong password)
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use fast_paseto::KeyManager;
+    /// use fast_paseto::KeyGenerator;
+    ///
+    /// let key = KeyGenerator::generate_symmetric_key();
+    /// let password = "secure-password-123";
+    /// let encrypted = KeyManager::local_pw_encrypt(&key, password).unwrap();
+    /// let decrypted = KeyManager::local_pw_decrypt(&encrypted, password).unwrap();
+    /// assert_eq!(key, decrypted);
+    /// ```
+    pub fn local_pw_decrypt(encrypted: &str, password: &str) -> Result<[u8; 32], PasetoError> {
+        use argon2::{Algorithm, Argon2, Params, Version};
+
+        // Parse format: k4.local-pw.{base64url_data}
+        let parts: Vec<&str> = encrypted.split('.').collect();
+
+        if parts.len() != 3 {
+            return Err(PasetoError::InvalidPaserkFormat(
+                "PASERK local-pw must have exactly 3 parts".to_string(),
+            ));
+        }
+
+        if parts[0] != "k4" {
+            return Err(PasetoError::InvalidPaserkFormat(format!(
+                "Unsupported PASERK version: {}",
+                parts[0]
+            )));
+        }
+
+        if parts[1] != "local-pw" {
+            return Err(PasetoError::InvalidPaserkFormat(format!(
+                "Expected 'local-pw', got '{}'",
+                parts[1]
+            )));
+        }
+
+        // Decode combined data
+        let combined = BASE64_URL_SAFE_NO_PAD
+            .decode(parts[2])
+            .map_err(|e| PasetoError::InvalidPaserkFormat(format!("Invalid base64url: {}", e)))?;
+
+        if combined.len() < 16 {
+            return Err(PasetoError::InvalidPaserkFormat(
+                "Encrypted data too short".to_string(),
+            ));
+        }
+
+        // Extract salt and encrypted payload
+        let salt = &combined[..16];
+        let encrypted_payload = &combined[16..];
+
+        // Derive decryption key using Argon2id
+        let params = Params::new(65536, 2, 1, Some(32))
+            .map_err(|e| PasetoError::CryptoError(format!("Argon2 params error: {}", e)))?;
+        let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
+
+        let mut derived_key = [0u8; 32];
+        argon2
+            .hash_password_into(password.as_bytes(), salt, &mut derived_key)
+            .map_err(|e| PasetoError::CryptoError(format!("Argon2 error: {}", e)))?;
+
+        // Reconstruct v4.local token and decrypt
+        let token = format!(
+            "v4.local.{}",
+            BASE64_URL_SAFE_NO_PAD.encode(encrypted_payload)
+        );
+
+        let verifier = TokenVerifier::new(None);
+        let key_bytes = verifier.v4_local_decrypt(
+            &token,
+            &derived_key,
+            None, // No footer
+            None, // No implicit assertion
+        )?;
+
+        if key_bytes.len() != 32 {
+            return Err(PasetoError::InvalidPaserkFormat(format!(
+                "Decrypted key must be 32 bytes, got {}",
+                key_bytes.len()
+            )));
+        }
+
+        let mut key = [0u8; 32];
+        key.copy_from_slice(&key_bytes);
+        Ok(key)
+    }
+
+    /// Encrypt an Ed25519 secret key with a password (PASERK secret-pw)
+    ///
+    /// Uses Argon2id for key derivation and v4.local encryption.
+    /// Format: `k4.secret-pw.{base64url_encrypted_data}`
+    ///
+    /// The encrypted data contains:
+    /// - Salt (16 bytes) for Argon2id
+    /// - Encrypted payload from v4.local encryption
+    ///
+    /// # Arguments
+    ///
+    /// * `secret_key` - 64-byte Ed25519 secret key to encrypt
+    /// * `password` - Password string
+    ///
+    /// # Returns
+    ///
+    /// A PASERK secret-pw encrypted key string
+    ///
+    /// # Errors
+    ///
+    /// Returns `PasetoError::CryptoError` if encryption fails
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use fast_paseto::KeyManager;
+    /// use fast_paseto::KeyGenerator;
+    ///
+    /// let keypair = KeyGenerator::generate_ed25519_keypair();
+    /// let password = "secure-password-123";
+    /// let encrypted = KeyManager::secret_pw_encrypt(&keypair.secret_key, password).unwrap();
+    /// assert!(encrypted.starts_with("k4.secret-pw."));
+    /// ```
+    pub fn secret_pw_encrypt(secret_key: &[u8; 64], password: &str) -> Result<String, PasetoError> {
+        use argon2::{Algorithm, Argon2, Params, Version};
+        use rand::Rng;
+
+        // Generate random salt (16 bytes)
+        let mut salt = [0u8; 16];
+        rand::thread_rng().fill(&mut salt);
+
+        // Derive encryption key using Argon2id
+        // PASERK recommends: m=64MB (65536 KB), t=2 iterations, p=1 parallelism
+        let params = Params::new(65536, 2, 1, Some(32))
+            .map_err(|e| PasetoError::CryptoError(format!("Argon2 params error: {}", e)))?;
+        let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
+
+        let mut derived_key = [0u8; 32];
+        argon2
+            .hash_password_into(password.as_bytes(), &salt, &mut derived_key)
+            .map_err(|e| PasetoError::CryptoError(format!("Argon2 error: {}", e)))?;
+
+        // Encrypt the secret key using v4.local encryption
+        let wrapped_token = TokenGenerator::v4_local_encrypt(
+            &derived_key,
+            secret_key,
+            None, // No footer
+            None, // No implicit assertion
+        )?;
+
+        // Extract payload from token (after "v4.local.")
+        let parts: Vec<&str> = wrapped_token.split('.').collect();
+        if parts.len() < 3 {
+            return Err(PasetoError::CryptoError(
+                "Invalid wrapped token format".to_string(),
+            ));
+        }
+
+        // Combine salt + encrypted payload
+        let encrypted_payload = BASE64_URL_SAFE_NO_PAD
+            .decode(parts[2])
+            .map_err(|e| PasetoError::CryptoError(format!("Base64 decode error: {}", e)))?;
+
+        let mut combined = Vec::with_capacity(16 + encrypted_payload.len());
+        combined.extend_from_slice(&salt);
+        combined.extend_from_slice(&encrypted_payload);
+
+        let encoded = BASE64_URL_SAFE_NO_PAD.encode(&combined);
+        Ok(format!("k4.secret-pw.{}", encoded))
+    }
+
+    /// Decrypt an Ed25519 secret key with a password (PASERK secret-pw)
+    ///
+    /// Decrypts a PASERK secret-pw encrypted key string using a password,
+    /// returning the original 64-byte Ed25519 secret key.
+    ///
+    /// # Arguments
+    ///
+    /// * `encrypted` - PASERK secret-pw encrypted key string
+    /// * `password` - Password string
+    ///
+    /// # Returns
+    ///
+    /// The decrypted 64-byte Ed25519 secret key
+    ///
+    /// # Errors
+    ///
+    /// Returns `PasetoError::InvalidPaserkFormat` if the format is invalid
+    /// Returns `PasetoError::AuthenticationFailed` if decryption fails (wrong password)
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use fast_paseto::KeyManager;
+    /// use fast_paseto::KeyGenerator;
+    ///
+    /// let keypair = KeyGenerator::generate_ed25519_keypair();
+    /// let password = "secure-password-123";
+    /// let encrypted = KeyManager::secret_pw_encrypt(&keypair.secret_key, password).unwrap();
+    /// let decrypted = KeyManager::secret_pw_decrypt(&encrypted, password).unwrap();
+    /// assert_eq!(keypair.secret_key, decrypted);
+    /// ```
+    pub fn secret_pw_decrypt(encrypted: &str, password: &str) -> Result<[u8; 64], PasetoError> {
+        use argon2::{Algorithm, Argon2, Params, Version};
+
+        // Parse format: k4.secret-pw.{base64url_data}
+        let parts: Vec<&str> = encrypted.split('.').collect();
+
+        if parts.len() != 3 {
+            return Err(PasetoError::InvalidPaserkFormat(
+                "PASERK secret-pw must have exactly 3 parts".to_string(),
+            ));
+        }
+
+        if parts[0] != "k4" {
+            return Err(PasetoError::InvalidPaserkFormat(format!(
+                "Unsupported PASERK version: {}",
+                parts[0]
+            )));
+        }
+
+        if parts[1] != "secret-pw" {
+            return Err(PasetoError::InvalidPaserkFormat(format!(
+                "Expected 'secret-pw', got '{}'",
+                parts[1]
+            )));
+        }
+
+        // Decode combined data
+        let combined = BASE64_URL_SAFE_NO_PAD
+            .decode(parts[2])
+            .map_err(|e| PasetoError::InvalidPaserkFormat(format!("Invalid base64url: {}", e)))?;
+
+        if combined.len() < 16 {
+            return Err(PasetoError::InvalidPaserkFormat(
+                "Encrypted data too short".to_string(),
+            ));
+        }
+
+        // Extract salt and encrypted payload
+        let salt = &combined[..16];
+        let encrypted_payload = &combined[16..];
+
+        // Derive decryption key using Argon2id
+        let params = Params::new(65536, 2, 1, Some(32))
+            .map_err(|e| PasetoError::CryptoError(format!("Argon2 params error: {}", e)))?;
+        let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
+
+        let mut derived_key = [0u8; 32];
+        argon2
+            .hash_password_into(password.as_bytes(), salt, &mut derived_key)
+            .map_err(|e| PasetoError::CryptoError(format!("Argon2 error: {}", e)))?;
+
+        // Reconstruct v4.local token and decrypt
+        let token = format!(
+            "v4.local.{}",
+            BASE64_URL_SAFE_NO_PAD.encode(encrypted_payload)
+        );
+
+        let verifier = TokenVerifier::new(None);
+        let key_bytes = verifier.v4_local_decrypt(
+            &token,
+            &derived_key,
+            None, // No footer
+            None, // No implicit assertion
+        )?;
+
+        if key_bytes.len() != 64 {
+            return Err(PasetoError::InvalidPaserkFormat(format!(
+                "Decrypted secret key must be 64 bytes, got {}",
+                key_bytes.len()
+            )));
+        }
+
+        let mut key = [0u8; 64];
+        key.copy_from_slice(&key_bytes);
+        Ok(key)
+    }
+
     /// Serialize a symmetric key to PASERK local format
     ///
     /// Format: `k4.local.{base64url_key}`
@@ -139,6 +822,195 @@ impl KeyManager {
                 parts[1]
             ))),
         }
+    }
+
+    /// Load an Ed25519 private key from PEM format (PKCS#8)
+    ///
+    /// Parses a PEM-encoded Ed25519 private key in PKCS#8 format and returns
+    /// the 64-byte secret key suitable for use with v4.public tokens.
+    ///
+    /// # Arguments
+    ///
+    /// * `pem` - PEM-encoded Ed25519 private key string
+    ///
+    /// # Returns
+    ///
+    /// A 64-byte Ed25519 secret key
+    ///
+    /// # Errors
+    ///
+    /// Returns `PasetoError::InvalidPemFormat` if:
+    /// - The PEM format is invalid
+    /// - The key is not an Ed25519 key
+    /// - The key data is malformed
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use fast_paseto::KeyManager;
+    ///
+    /// let pem = r#"-----BEGIN PRIVATE KEY-----
+    /// MC4CAQAwBQYDK2VwBCIEIGqPaUKpqt0MJjJgXgXgXgXgXgXgXgXgXgXgXgXgXgXg
+    /// -----END PRIVATE KEY-----"#;
+    ///
+    /// let secret_key = KeyManager::ed25519_from_pem(pem);
+    /// ```
+    pub fn ed25519_from_pem(pem: &str) -> Result<[u8; 64], PasetoError> {
+        use ed25519_dalek::SigningKey;
+        use ed25519_dalek::pkcs8::DecodePrivateKey;
+
+        let signing_key = SigningKey::from_pkcs8_pem(pem).map_err(|e| {
+            PasetoError::InvalidPemFormat(format!("Failed to parse Ed25519 private key PEM: {}", e))
+        })?;
+
+        // Get the secret key bytes (32 bytes seed + 32 bytes public key = 64 bytes)
+        let mut secret_key = [0u8; 64];
+        secret_key[..32].copy_from_slice(signing_key.as_bytes());
+        secret_key[32..].copy_from_slice(signing_key.verifying_key().as_bytes());
+
+        Ok(secret_key)
+    }
+
+    /// Load an Ed25519 public key from PEM format (SPKI)
+    ///
+    /// Parses a PEM-encoded Ed25519 public key in SPKI (Subject Public Key Info)
+    /// format and returns the 32-byte public key suitable for use with v4.public
+    /// token verification.
+    ///
+    /// # Arguments
+    ///
+    /// * `pem` - PEM-encoded Ed25519 public key string
+    ///
+    /// # Returns
+    ///
+    /// A 32-byte Ed25519 public key
+    ///
+    /// # Errors
+    ///
+    /// Returns `PasetoError::InvalidPemFormat` if:
+    /// - The PEM format is invalid
+    /// - The key is not an Ed25519 key
+    /// - The key data is malformed
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use fast_paseto::KeyManager;
+    ///
+    /// let pem = r#"-----BEGIN PUBLIC KEY-----
+    /// MCowBQYDK2VwAyEAGb9F2CMCwPz0vPz0vPz0vPz0vPz0vPz0vPz0vPz0vPw=
+    /// -----END PUBLIC KEY-----"#;
+    ///
+    /// let public_key = KeyManager::ed25519_public_from_pem(pem);
+    /// ```
+    pub fn ed25519_public_from_pem(pem: &str) -> Result<[u8; 32], PasetoError> {
+        use ed25519_dalek::VerifyingKey;
+        use ed25519_dalek::pkcs8::DecodePublicKey;
+
+        let verifying_key = VerifyingKey::from_public_key_pem(pem).map_err(|e| {
+            PasetoError::InvalidPemFormat(format!("Failed to parse Ed25519 public key PEM: {}", e))
+        })?;
+
+        let mut public_key = [0u8; 32];
+        public_key.copy_from_slice(verifying_key.as_bytes());
+
+        Ok(public_key)
+    }
+
+    /// Load a P-384 private key from PEM format (PKCS#8)
+    ///
+    /// Parses a PEM-encoded P-384 private key in PKCS#8 format and returns
+    /// the 48-byte secret key suitable for use with v3.public tokens.
+    ///
+    /// # Arguments
+    ///
+    /// * `pem` - PEM-encoded P-384 private key string
+    ///
+    /// # Returns
+    ///
+    /// A 48-byte P-384 secret key
+    ///
+    /// # Errors
+    ///
+    /// Returns `PasetoError::InvalidPemFormat` if:
+    /// - The PEM format is invalid
+    /// - The key is not a P-384 key
+    /// - The key data is malformed
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use fast_paseto::KeyManager;
+    ///
+    /// let pem = r#"-----BEGIN PRIVATE KEY-----
+    /// MIG2AgEAMBAGByqGSM49AgEGBSuBBAAiBIGeMIGbAgEBBD...
+    /// -----END PRIVATE KEY-----"#;
+    ///
+    /// let secret_key = KeyManager::p384_from_pem(pem);
+    /// ```
+    pub fn p384_from_pem(pem: &str) -> Result<[u8; 48], PasetoError> {
+        use p384::ecdsa::SigningKey;
+        use p384::pkcs8::DecodePrivateKey;
+
+        let signing_key = SigningKey::from_pkcs8_pem(pem).map_err(|e| {
+            PasetoError::InvalidPemFormat(format!("Failed to parse P-384 private key PEM: {}", e))
+        })?;
+
+        // Get the secret key bytes (48 bytes for P-384)
+        let mut secret_key = [0u8; 48];
+        secret_key.copy_from_slice(&signing_key.to_bytes());
+
+        Ok(secret_key)
+    }
+
+    /// Load a P-384 public key from PEM format (SPKI)
+    ///
+    /// Parses a PEM-encoded P-384 public key in SPKI (Subject Public Key Info)
+    /// format and returns the 49-byte compressed public key suitable for use
+    /// with v3.public token verification.
+    ///
+    /// # Arguments
+    ///
+    /// * `pem` - PEM-encoded P-384 public key string
+    ///
+    /// # Returns
+    ///
+    /// A 49-byte P-384 public key (compressed point format)
+    ///
+    /// # Errors
+    ///
+    /// Returns `PasetoError::InvalidPemFormat` if:
+    /// - The PEM format is invalid
+    /// - The key is not a P-384 key
+    /// - The key data is malformed
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use fast_paseto::KeyManager;
+    ///
+    /// let pem = r#"-----BEGIN PUBLIC KEY-----
+    /// MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAE...
+    /// -----END PUBLIC KEY-----"#;
+    ///
+    /// let public_key = KeyManager::p384_public_from_pem(pem);
+    /// ```
+    pub fn p384_public_from_pem(pem: &str) -> Result<[u8; 49], PasetoError> {
+        use p384::ecdsa::VerifyingKey;
+        use p384::pkcs8::DecodePublicKey;
+
+        let verifying_key = VerifyingKey::from_public_key_pem(pem).map_err(|e| {
+            PasetoError::InvalidPemFormat(format!("Failed to parse P-384 public key PEM: {}", e))
+        })?;
+
+        // Get the public key in compressed form (49 bytes)
+        let encoded_point = verifying_key.to_encoded_point(true); // compressed
+        let public_bytes = encoded_point.as_bytes();
+
+        let mut public_key = [0u8; 49];
+        public_key.copy_from_slice(public_bytes);
+
+        Ok(public_key)
     }
 }
 
@@ -661,6 +1533,105 @@ mod tests {
         assert_ne!(hash1, hash2);
     }
 
+    // PASERK Key Wrapping Tests
+
+    #[test]
+    fn test_local_wrap_format() {
+        let key = KeyGenerator::generate_symmetric_key();
+        let wrapping_key = KeyGenerator::generate_symmetric_key();
+        let wrapped = KeyManager::local_wrap(&key, &wrapping_key).unwrap();
+
+        // Check format
+        assert!(wrapped.starts_with("k4.local-wrap.pie."));
+
+        // Should have exactly 4 parts
+        let parts: Vec<&str> = wrapped.split('.').collect();
+        assert_eq!(parts.len(), 4);
+        assert_eq!(parts[0], "k4");
+        assert_eq!(parts[1], "local-wrap");
+        assert_eq!(parts[2], "pie");
+    }
+
+    #[test]
+    fn test_local_wrap_unwrap_roundtrip() {
+        let key = KeyGenerator::generate_symmetric_key();
+        let wrapping_key = KeyGenerator::generate_symmetric_key();
+
+        // Wrap and unwrap
+        let wrapped = KeyManager::local_wrap(&key, &wrapping_key).unwrap();
+        let unwrapped = KeyManager::local_unwrap(&wrapped, &wrapping_key).unwrap();
+
+        // Should get back the original key
+        assert_eq!(key, unwrapped);
+    }
+
+    #[test]
+    fn test_local_unwrap_wrong_key() {
+        let key = KeyGenerator::generate_symmetric_key();
+        let wrapping_key1 = KeyGenerator::generate_symmetric_key();
+        let wrapping_key2 = KeyGenerator::generate_symmetric_key();
+
+        // Wrap with key1
+        let wrapped = KeyManager::local_wrap(&key, &wrapping_key1).unwrap();
+
+        // Try to unwrap with key2 - should fail
+        let result = KeyManager::local_unwrap(&wrapped, &wrapping_key2);
+        assert!(result.is_err());
+        assert!(matches!(result, Err(PasetoError::AuthenticationFailed)));
+    }
+
+    #[test]
+    fn test_local_unwrap_invalid_format() {
+        let wrapping_key = KeyGenerator::generate_symmetric_key();
+
+        // Test various invalid formats
+        let invalid_formats = vec![
+            "k4.local.test",              // Wrong type
+            "k4.local-wrap.test",         // Missing part
+            "k3.local-wrap.pie.test",     // Wrong version
+            "k4.secret-wrap.pie.test",    // Wrong type
+            "k4.local-wrap.invalid.test", // Wrong algorithm
+        ];
+
+        for invalid in invalid_formats {
+            let result = KeyManager::local_unwrap(invalid, &wrapping_key);
+            assert!(result.is_err(), "Should fail for: {}", invalid);
+        }
+    }
+
+    #[test]
+    fn test_local_wrap_different_keys_different_output() {
+        let key = KeyGenerator::generate_symmetric_key();
+        let wrapping_key1 = KeyGenerator::generate_symmetric_key();
+        let wrapping_key2 = KeyGenerator::generate_symmetric_key();
+
+        // Wrap with different wrapping keys
+        let wrapped1 = KeyManager::local_wrap(&key, &wrapping_key1).unwrap();
+        let wrapped2 = KeyManager::local_wrap(&key, &wrapping_key2).unwrap();
+
+        // Should produce different wrapped keys
+        assert_ne!(wrapped1, wrapped2);
+    }
+
+    #[test]
+    fn test_local_wrap_randomness() {
+        let key = KeyGenerator::generate_symmetric_key();
+        let wrapping_key = KeyGenerator::generate_symmetric_key();
+
+        // Wrap the same key twice
+        let wrapped1 = KeyManager::local_wrap(&key, &wrapping_key).unwrap();
+        let wrapped2 = KeyManager::local_wrap(&key, &wrapping_key).unwrap();
+
+        // Should produce different wrapped keys due to random nonce
+        assert_ne!(wrapped1, wrapped2);
+
+        // But both should unwrap to the same key
+        let unwrapped1 = KeyManager::local_unwrap(&wrapped1, &wrapping_key).unwrap();
+        let unwrapped2 = KeyManager::local_unwrap(&wrapped2, &wrapping_key).unwrap();
+        assert_eq!(unwrapped1, unwrapped2);
+        assert_eq!(unwrapped1, key);
+    }
+
     // Property-based tests
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(100))]
@@ -851,6 +1822,221 @@ mod tests {
 
             // No padding characters
             prop_assert!(!pid.contains('='), "PID must not contain padding");
+        }
+    }
+
+    // Password-based encryption tests
+
+    #[test]
+    fn test_local_pw_encrypt_format() {
+        let key = KeyGenerator::generate_symmetric_key();
+        let password = "test-password-123";
+        let encrypted = KeyManager::local_pw_encrypt(&key, password).unwrap();
+
+        assert!(encrypted.starts_with("k4.local-pw."));
+        assert_eq!(encrypted.split('.').count(), 3);
+    }
+
+    #[test]
+    fn test_local_pw_roundtrip() {
+        let key = KeyGenerator::generate_symmetric_key();
+        let password = "secure-password-456";
+
+        let encrypted = KeyManager::local_pw_encrypt(&key, password).unwrap();
+        let decrypted = KeyManager::local_pw_decrypt(&encrypted, password).unwrap();
+
+        assert_eq!(key, decrypted);
+    }
+
+    #[test]
+    fn test_local_pw_wrong_password() {
+        let key = KeyGenerator::generate_symmetric_key();
+        let password = "correct-password";
+        let wrong_password = "wrong-password";
+
+        let encrypted = KeyManager::local_pw_encrypt(&key, password).unwrap();
+        let result = KeyManager::local_pw_decrypt(&encrypted, wrong_password);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_local_pw_invalid_format() {
+        let password = "test";
+
+        // Wrong version
+        let result = KeyManager::local_pw_decrypt("k3.local-pw.test", password);
+        assert!(result.is_err());
+
+        // Wrong type
+        let result = KeyManager::local_pw_decrypt("k4.secret-pw.test", password);
+        assert!(result.is_err());
+
+        // Too few parts
+        let result = KeyManager::local_pw_decrypt("k4.local-pw", password);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_local_pw_different_encryptions() {
+        let key = KeyGenerator::generate_symmetric_key();
+        let password = "same-password";
+
+        // Same key encrypted twice should produce different ciphertexts (due to random salt)
+        let encrypted1 = KeyManager::local_pw_encrypt(&key, password).unwrap();
+        let encrypted2 = KeyManager::local_pw_encrypt(&key, password).unwrap();
+
+        assert_ne!(encrypted1, encrypted2);
+
+        // But both should decrypt to the same key
+        let decrypted1 = KeyManager::local_pw_decrypt(&encrypted1, password).unwrap();
+        let decrypted2 = KeyManager::local_pw_decrypt(&encrypted2, password).unwrap();
+
+        assert_eq!(decrypted1, decrypted2);
+        assert_eq!(decrypted1, key);
+    }
+
+    // Secret key password-based encryption tests
+
+    #[test]
+    fn test_secret_pw_encrypt_format() {
+        let keypair = KeyGenerator::generate_ed25519_keypair();
+        let password = "test-password-123";
+        let encrypted = KeyManager::secret_pw_encrypt(&keypair.secret_key, password).unwrap();
+
+        assert!(encrypted.starts_with("k4.secret-pw."));
+        assert_eq!(encrypted.split('.').count(), 3);
+    }
+
+    #[test]
+    fn test_secret_pw_roundtrip() {
+        let keypair = KeyGenerator::generate_ed25519_keypair();
+        let password = "secure-password-456";
+
+        let encrypted = KeyManager::secret_pw_encrypt(&keypair.secret_key, password).unwrap();
+        let decrypted = KeyManager::secret_pw_decrypt(&encrypted, password).unwrap();
+
+        assert_eq!(keypair.secret_key, decrypted);
+    }
+
+    #[test]
+    fn test_secret_pw_wrong_password() {
+        let keypair = KeyGenerator::generate_ed25519_keypair();
+        let password = "correct-password";
+        let wrong_password = "wrong-password";
+
+        let encrypted = KeyManager::secret_pw_encrypt(&keypair.secret_key, password).unwrap();
+        let result = KeyManager::secret_pw_decrypt(&encrypted, wrong_password);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_secret_pw_invalid_format() {
+        let password = "test";
+
+        // Wrong version
+        let result = KeyManager::secret_pw_decrypt("k3.secret-pw.test", password);
+        assert!(result.is_err());
+
+        // Wrong type
+        let result = KeyManager::secret_pw_decrypt("k4.local-pw.test", password);
+        assert!(result.is_err());
+
+        // Too few parts
+        let result = KeyManager::secret_pw_decrypt("k4.secret-pw", password);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_secret_pw_different_encryptions() {
+        let keypair = KeyGenerator::generate_ed25519_keypair();
+        let password = "same-password";
+
+        // Same key encrypted twice should produce different ciphertexts (due to random salt)
+        let encrypted1 = KeyManager::secret_pw_encrypt(&keypair.secret_key, password).unwrap();
+        let encrypted2 = KeyManager::secret_pw_encrypt(&keypair.secret_key, password).unwrap();
+
+        assert_ne!(encrypted1, encrypted2);
+
+        // But both should decrypt to the same key
+        let decrypted1 = KeyManager::secret_pw_decrypt(&encrypted1, password).unwrap();
+        let decrypted2 = KeyManager::secret_pw_decrypt(&encrypted2, password).unwrap();
+
+        assert_eq!(decrypted1, decrypted2);
+        assert_eq!(decrypted1, keypair.secret_key);
+    }
+
+    // P-384 PEM tests
+
+    #[test]
+    fn test_p384_pem_roundtrip() {
+        use p384::ecdsa::SigningKey;
+        use p384::pkcs8::EncodePrivateKey;
+
+        // Generate a P-384 key pair
+        let keypair = KeyGenerator::generate_p384_keypair();
+
+        // Create a signing key from the secret bytes
+        let signing_key =
+            SigningKey::from_bytes((&keypair.secret_key).into()).expect("Valid secret key");
+
+        // Export to PEM
+        let pem = signing_key
+            .to_pkcs8_pem(p384::pkcs8::LineEnding::LF)
+            .expect("PEM encoding should succeed");
+
+        // Load back from PEM
+        let loaded_secret =
+            KeyManager::p384_from_pem(pem.as_str()).expect("PEM loading should succeed");
+
+        assert_eq!(keypair.secret_key, loaded_secret);
+    }
+
+    #[test]
+    fn test_p384_public_pem_roundtrip() {
+        use p384::ecdsa::SigningKey;
+        use p384::pkcs8::EncodePublicKey;
+
+        // Generate a P-384 key pair
+        let keypair = KeyGenerator::generate_p384_keypair();
+
+        // Create a signing key from the secret bytes
+        let signing_key =
+            SigningKey::from_bytes((&keypair.secret_key).into()).expect("Valid secret key");
+        let verifying_key = signing_key.verifying_key();
+
+        // Export public key to PEM
+        let pem = verifying_key
+            .to_public_key_pem(p384::pkcs8::LineEnding::LF)
+            .expect("PEM encoding should succeed");
+
+        // Load back from PEM
+        let loaded_public =
+            KeyManager::p384_public_from_pem(&pem).expect("PEM loading should succeed");
+
+        assert_eq!(keypair.public_key, loaded_public);
+    }
+
+    #[test]
+    fn test_p384_from_pem_invalid() {
+        let invalid_pem = "not a valid PEM";
+        let result = KeyManager::p384_from_pem(invalid_pem);
+        assert!(result.is_err());
+        match result {
+            Err(PasetoError::InvalidPemFormat(_)) => {}
+            _ => panic!("Expected InvalidPemFormat error"),
+        }
+    }
+
+    #[test]
+    fn test_p384_public_from_pem_invalid() {
+        let invalid_pem = "not a valid PEM";
+        let result = KeyManager::p384_public_from_pem(invalid_pem);
+        assert!(result.is_err());
+        match result {
+            Err(PasetoError::InvalidPemFormat(_)) => {}
+            _ => panic!("Expected InvalidPemFormat error"),
         }
     }
 }
