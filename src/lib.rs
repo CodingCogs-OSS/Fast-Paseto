@@ -4,6 +4,7 @@ use pyo3::prelude::*;
 pub mod claims_manager;
 pub mod error;
 pub mod key_generator;
+pub mod key_manager;
 pub mod pae;
 pub mod payload;
 pub mod token_generator;
@@ -13,6 +14,7 @@ pub mod version;
 pub use claims_manager::ClaimsManager;
 pub use error::PasetoError;
 pub use key_generator::{Ed25519KeyPair, KeyGenerator};
+pub use key_manager::{KeyManager, PaserkId, PaserkKey};
 pub use pae::Pae;
 pub use payload::TokenPayload;
 pub use token_generator::TokenGenerator;
@@ -524,8 +526,8 @@ impl Paseto {
         implicit_assertion: Option<&[u8]>,
         deserializer: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Token> {
-        use pyo3::types::{PyBytes, PyDict, PyString};
         use base64::prelude::*;
+        use pyo3::types::{PyBytes, PyDict, PyString};
 
         // Parse version and purpose
         let version_enum = Version::from_str(version)?;
@@ -614,7 +616,12 @@ impl Paseto {
                 let key_array: [u8; 32] = key_bytes
                     .try_into()
                     .map_err(|_| PasetoKeyError::new_err("Failed to convert key to array"))?;
-                verifier.v4_local_decrypt(token, &key_array, footer_bytes.as_deref(), implicit_assertion)?
+                verifier.v4_local_decrypt(
+                    token,
+                    &key_array,
+                    footer_bytes.as_deref(),
+                    implicit_assertion,
+                )?
             }
             (Version::V4, Purpose::Public) => {
                 // v4.public requires 32-byte public key
@@ -627,7 +634,12 @@ impl Paseto {
                 let key_array: [u8; 32] = key_bytes
                     .try_into()
                     .map_err(|_| PasetoKeyError::new_err("Failed to convert key to array"))?;
-                verifier.v4_public_verify(token, &key_array, footer_bytes.as_deref(), implicit_assertion)?
+                verifier.v4_public_verify(
+                    token,
+                    &key_array,
+                    footer_bytes.as_deref(),
+                    implicit_assertion,
+                )?
             }
             _ => {
                 return Err(PasetoValidationError::new_err(format!(
@@ -644,8 +656,9 @@ impl Paseto {
             PyBytes::new(py, &payload_bytes).into_any()
         } else {
             // JSON loads expects str
-            let payload_str = std::str::from_utf8(&payload_bytes)
-                .map_err(|e| PasetoValidationError::new_err(format!("Invalid UTF-8 in payload: {}", e)))?;
+            let payload_str = std::str::from_utf8(&payload_bytes).map_err(|e| {
+                PasetoValidationError::new_err(format!("Invalid UTF-8 in payload: {}", e))
+            })?;
             PyString::new(py, payload_str).into_any()
         };
 
@@ -653,8 +666,9 @@ impl Paseto {
             Ok(obj) => obj,
             Err(_) => {
                 // If bytes didn't work, try with string
-                let payload_str = std::str::from_utf8(&payload_bytes)
-                    .map_err(|e| PasetoValidationError::new_err(format!("Invalid UTF-8 in payload: {}", e)))?;
+                let payload_str = std::str::from_utf8(&payload_bytes).map_err(|e| {
+                    PasetoValidationError::new_err(format!("Invalid UTF-8 in payload: {}", e))
+                })?;
                 loads.call1((payload_str,))?
             }
         };
@@ -667,8 +681,9 @@ impl Paseto {
                 PyBytes::new(py, &footer_data).into_any()
             } else {
                 // JSON loads expects str
-                let footer_str = std::str::from_utf8(&footer_data)
-                    .map_err(|e| PasetoValidationError::new_err(format!("Invalid UTF-8 in footer: {}", e)))?;
+                let footer_str = std::str::from_utf8(&footer_data).map_err(|e| {
+                    PasetoValidationError::new_err(format!("Invalid UTF-8 in footer: {}", e))
+                })?;
                 PyString::new(py, footer_str).into_any()
             };
 
@@ -676,8 +691,9 @@ impl Paseto {
                 Ok(obj) => Some(obj.unbind()),
                 Err(_) => {
                     // If bytes didn't work, try with string
-                    let footer_str = std::str::from_utf8(&footer_data)
-                        .map_err(|e| PasetoValidationError::new_err(format!("Invalid UTF-8 in footer: {}", e)))?;
+                    let footer_str = std::str::from_utf8(&footer_data).map_err(|e| {
+                        PasetoValidationError::new_err(format!("Invalid UTF-8 in footer: {}", e))
+                    })?;
                     match loads.call1((footer_str,)) {
                         Ok(obj) => Some(obj.unbind()),
                         Err(_) => {
@@ -713,6 +729,7 @@ impl Paseto {
 #[pymodule]
 fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
     use crate::key_generator::KeyGenerator;
+    use crate::key_manager::{KeyManager, PaserkKey};
     use pyo3::types::PyBytes;
 
     // Register Paseto class
@@ -1013,8 +1030,8 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
         deserializer: Option<&Bound<'_, PyAny>>,
         leeway: u64,
     ) -> PyResult<Token> {
-        use pyo3::types::{PyBytes, PyDict, PyString};
         use base64::prelude::*;
+        use pyo3::types::{PyBytes, PyDict, PyString};
 
         // Parse version and purpose
         let version_enum = Version::from_str(version)?;
@@ -1103,7 +1120,12 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
                 let key_array: [u8; 32] = key_bytes
                     .try_into()
                     .map_err(|_| PasetoKeyError::new_err("Failed to convert key to array"))?;
-                verifier.v4_local_decrypt(token, &key_array, footer_bytes.as_deref(), implicit_assertion)?
+                verifier.v4_local_decrypt(
+                    token,
+                    &key_array,
+                    footer_bytes.as_deref(),
+                    implicit_assertion,
+                )?
             }
             (Version::V4, Purpose::Public) => {
                 // v4.public requires 32-byte public key
@@ -1116,7 +1138,12 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
                 let key_array: [u8; 32] = key_bytes
                     .try_into()
                     .map_err(|_| PasetoKeyError::new_err("Failed to convert key to array"))?;
-                verifier.v4_public_verify(token, &key_array, footer_bytes.as_deref(), implicit_assertion)?
+                verifier.v4_public_verify(
+                    token,
+                    &key_array,
+                    footer_bytes.as_deref(),
+                    implicit_assertion,
+                )?
             }
             _ => {
                 return Err(PasetoValidationError::new_err(format!(
@@ -1133,8 +1160,9 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
             PyBytes::new(py, &payload_bytes).into_any()
         } else {
             // JSON loads expects str
-            let payload_str = std::str::from_utf8(&payload_bytes)
-                .map_err(|e| PasetoValidationError::new_err(format!("Invalid UTF-8 in payload: {}", e)))?;
+            let payload_str = std::str::from_utf8(&payload_bytes).map_err(|e| {
+                PasetoValidationError::new_err(format!("Invalid UTF-8 in payload: {}", e))
+            })?;
             PyString::new(py, payload_str).into_any()
         };
 
@@ -1142,8 +1170,9 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
             Ok(obj) => obj,
             Err(_) => {
                 // If bytes didn't work, try with string
-                let payload_str = std::str::from_utf8(&payload_bytes)
-                    .map_err(|e| PasetoValidationError::new_err(format!("Invalid UTF-8 in payload: {}", e)))?;
+                let payload_str = std::str::from_utf8(&payload_bytes).map_err(|e| {
+                    PasetoValidationError::new_err(format!("Invalid UTF-8 in payload: {}", e))
+                })?;
                 loads.call1((payload_str,))?
             }
         };
@@ -1156,8 +1185,9 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
                 PyBytes::new(py, &footer_data).into_any()
             } else {
                 // JSON loads expects str
-                let footer_str = std::str::from_utf8(&footer_data)
-                    .map_err(|e| PasetoValidationError::new_err(format!("Invalid UTF-8 in footer: {}", e)))?;
+                let footer_str = std::str::from_utf8(&footer_data).map_err(|e| {
+                    PasetoValidationError::new_err(format!("Invalid UTF-8 in footer: {}", e))
+                })?;
                 PyString::new(py, footer_str).into_any()
             };
 
@@ -1165,8 +1195,9 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
                 Ok(obj) => Some(obj.unbind()),
                 Err(_) => {
                     // If bytes didn't work, try with string
-                    let footer_str = std::str::from_utf8(&footer_data)
-                        .map_err(|e| PasetoValidationError::new_err(format!("Invalid UTF-8 in footer: {}", e)))?;
+                    let footer_str = std::str::from_utf8(&footer_data).map_err(|e| {
+                        PasetoValidationError::new_err(format!("Invalid UTF-8 in footer: {}", e))
+                    })?;
                     match loads.call1((footer_str,)) {
                         Ok(obj) => Some(obj.unbind()),
                         Err(_) => {
@@ -1189,10 +1220,266 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
         })
     }
 
+    /// Serialize a symmetric key to PASERK local format
+    ///
+    /// Converts a 32-byte symmetric key to the PASERK format: k4.local.{base64url_key}
+    ///
+    /// Args:
+    ///     key: A 32-byte symmetric key (bytes)
+    ///
+    /// Returns:
+    ///     str: A PASERK-formatted string (e.g., "k4.local.AAAA...")
+    ///
+    /// Raises:
+    ///     PasetoKeyError: If the key is not exactly 32 bytes
+    ///
+    /// Example:
+    ///     >>> import fast_paseto
+    ///     >>> key = fast_paseto.generate_symmetric_key()
+    ///     >>> paserk = fast_paseto.to_paserk_local(key)
+    ///     >>> paserk.startswith("k4.local.")
+    ///     True
+    #[pyfunction]
+    fn to_paserk_local(key: &[u8]) -> PyResult<String> {
+        if key.len() != 32 {
+            return Err(PasetoKeyError::new_err(format!(
+                "Invalid key length for local key: expected 32 bytes, got {}",
+                key.len()
+            )));
+        }
+        let key_array: [u8; 32] = key
+            .try_into()
+            .map_err(|_| PasetoKeyError::new_err("Failed to convert key to array"))?;
+        Ok(KeyManager::to_paserk_local(&key_array))
+    }
+
+    /// Serialize an Ed25519 secret key to PASERK secret format
+    ///
+    /// Converts a 64-byte Ed25519 secret key to the PASERK format: k4.secret.{base64url_key}
+    ///
+    /// Args:
+    ///     key: A 64-byte Ed25519 secret key (bytes)
+    ///
+    /// Returns:
+    ///     str: A PASERK-formatted string (e.g., "k4.secret.AAAA...")
+    ///
+    /// Raises:
+    ///     PasetoKeyError: If the key is not exactly 64 bytes
+    ///
+    /// Example:
+    ///     >>> import fast_paseto
+    ///     >>> secret_key, public_key = fast_paseto.generate_keypair()
+    ///     >>> paserk = fast_paseto.to_paserk_secret(secret_key)
+    ///     >>> paserk.startswith("k4.secret.")
+    ///     True
+    #[pyfunction]
+    fn to_paserk_secret(key: &[u8]) -> PyResult<String> {
+        if key.len() != 64 {
+            return Err(PasetoKeyError::new_err(format!(
+                "Invalid key length for secret key: expected 64 bytes, got {}",
+                key.len()
+            )));
+        }
+        let key_array: [u8; 64] = key
+            .try_into()
+            .map_err(|_| PasetoKeyError::new_err("Failed to convert key to array"))?;
+        Ok(KeyManager::to_paserk_secret(&key_array))
+    }
+
+    /// Serialize an Ed25519 public key to PASERK public format
+    ///
+    /// Converts a 32-byte Ed25519 public key to the PASERK format: k4.public.{base64url_key}
+    ///
+    /// Args:
+    ///     key: A 32-byte Ed25519 public key (bytes)
+    ///
+    /// Returns:
+    ///     str: A PASERK-formatted string (e.g., "k4.public.AAAA...")
+    ///
+    /// Raises:
+    ///     PasetoKeyError: If the key is not exactly 32 bytes
+    ///
+    /// Example:
+    ///     >>> import fast_paseto
+    ///     >>> secret_key, public_key = fast_paseto.generate_keypair()
+    ///     >>> paserk = fast_paseto.to_paserk_public(public_key)
+    ///     >>> paserk.startswith("k4.public.")
+    ///     True
+    #[pyfunction]
+    fn to_paserk_public(key: &[u8]) -> PyResult<String> {
+        if key.len() != 32 {
+            return Err(PasetoKeyError::new_err(format!(
+                "Invalid key length for public key: expected 32 bytes, got {}",
+                key.len()
+            )));
+        }
+        let key_array: [u8; 32] = key
+            .try_into()
+            .map_err(|_| PasetoKeyError::new_err("Failed to convert key to array"))?;
+        Ok(KeyManager::to_paserk_public(&key_array))
+    }
+
+    /// Deserialize a PASERK string back to key bytes
+    ///
+    /// Parses a PASERK-formatted string and returns the key bytes.
+    /// Supports k4.local, k4.secret, and k4.public formats.
+    ///
+    /// Args:
+    ///     paserk: A PASERK-formatted string (e.g., "k4.local.AAAA...")
+    ///
+    /// Returns:
+    ///     tuple[str, bytes]: A tuple of (key_type, key_bytes) where:
+    ///         - key_type is "local", "secret", or "public"
+    ///         - key_bytes is the decoded key (32 bytes for local/public, 64 bytes for secret)
+    ///
+    /// Raises:
+    ///     PasetoKeyError: If the PASERK format is invalid or unsupported
+    ///
+    /// Example:
+    ///     >>> import fast_paseto
+    ///     >>> key = fast_paseto.generate_symmetric_key()
+    ///     >>> paserk = fast_paseto.to_paserk_local(key)
+    ///     >>> key_type, decoded_key = fast_paseto.from_paserk(paserk)
+    ///     >>> key_type
+    ///     'local'
+    ///     >>> decoded_key == key
+    ///     True
+    #[pyfunction]
+    fn from_paserk(py: Python<'_>, paserk: &str) -> PyResult<(String, Py<PyBytes>)> {
+        let parsed = KeyManager::from_paserk(paserk)?;
+
+        match parsed {
+            PaserkKey::Local(key) => Ok(("local".to_string(), PyBytes::new(py, &key).into())),
+            PaserkKey::Secret(key) => Ok(("secret".to_string(), PyBytes::new(py, &key).into())),
+            PaserkKey::Public(key) => Ok(("public".to_string(), PyBytes::new(py, &key).into())),
+        }
+    }
+
+    /// Generate a local ID (lid) for symmetric keys
+    ///
+    /// Creates a PASERK ID for a 32-byte symmetric key used in v4.local tokens.
+    /// The ID is deterministic - the same key always produces the same ID.
+    ///
+    /// Args:
+    ///     key: A 32-byte symmetric key (bytes)
+    ///
+    /// Returns:
+    ///     str: A PASERK local ID string in the format k4.lid.{base64url_hash}
+    ///
+    /// Raises:
+    ///     PasetoKeyError: If the key is not exactly 32 bytes
+    ///
+    /// Example:
+    ///     >>> import fast_paseto
+    ///     >>> key = fast_paseto.generate_symmetric_key()
+    ///     >>> lid = fast_paseto.generate_lid(key)
+    ///     >>> lid.startswith("k4.lid.")
+    ///     True
+    ///     >>> # Same key always produces same ID
+    ///     >>> lid2 = fast_paseto.generate_lid(key)
+    ///     >>> lid == lid2
+    ///     True
+    #[pyfunction]
+    fn generate_lid(key: &[u8]) -> PyResult<String> {
+        if key.len() != 32 {
+            return Err(PasetoKeyError::new_err(format!(
+                "Invalid key length for local key: expected 32 bytes, got {}",
+                key.len()
+            )));
+        }
+        let key_array: [u8; 32] = key
+            .try_into()
+            .map_err(|_| PasetoKeyError::new_err("Failed to convert key to array"))?;
+        Ok(PaserkId::generate_lid(&key_array))
+    }
+
+    /// Generate a secret ID (sid) for Ed25519 secret keys
+    ///
+    /// Creates a PASERK ID for a 64-byte Ed25519 secret key used in v4.public tokens.
+    /// The ID is deterministic - the same key always produces the same ID.
+    ///
+    /// Args:
+    ///     key: A 64-byte Ed25519 secret key (bytes)
+    ///
+    /// Returns:
+    ///     str: A PASERK secret ID string in the format k4.sid.{base64url_hash}
+    ///
+    /// Raises:
+    ///     PasetoKeyError: If the key is not exactly 64 bytes
+    ///
+    /// Example:
+    ///     >>> import fast_paseto
+    ///     >>> secret_key, public_key = fast_paseto.generate_keypair()
+    ///     >>> sid = fast_paseto.generate_sid(secret_key)
+    ///     >>> sid.startswith("k4.sid.")
+    ///     True
+    ///     >>> # Same key always produces same ID
+    ///     >>> sid2 = fast_paseto.generate_sid(secret_key)
+    ///     >>> sid == sid2
+    ///     True
+    #[pyfunction]
+    fn generate_sid(key: &[u8]) -> PyResult<String> {
+        if key.len() != 64 {
+            return Err(PasetoKeyError::new_err(format!(
+                "Invalid key length for secret key: expected 64 bytes, got {}",
+                key.len()
+            )));
+        }
+        let key_array: [u8; 64] = key
+            .try_into()
+            .map_err(|_| PasetoKeyError::new_err("Failed to convert key to array"))?;
+        Ok(PaserkId::generate_sid(&key_array))
+    }
+
+    /// Generate a public ID (pid) for Ed25519 public keys
+    ///
+    /// Creates a PASERK ID for a 32-byte Ed25519 public key used in v4.public tokens.
+    /// The ID is deterministic - the same key always produces the same ID.
+    ///
+    /// Args:
+    ///     key: A 32-byte Ed25519 public key (bytes)
+    ///
+    /// Returns:
+    ///     str: A PASERK public ID string in the format k4.pid.{base64url_hash}
+    ///
+    /// Raises:
+    ///     PasetoKeyError: If the key is not exactly 32 bytes
+    ///
+    /// Example:
+    ///     >>> import fast_paseto
+    ///     >>> secret_key, public_key = fast_paseto.generate_keypair()
+    ///     >>> pid = fast_paseto.generate_pid(public_key)
+    ///     >>> pid.startswith("k4.pid.")
+    ///     True
+    ///     >>> # Same key always produces same ID
+    ///     >>> pid2 = fast_paseto.generate_pid(public_key)
+    ///     >>> pid == pid2
+    ///     True
+    #[pyfunction]
+    fn generate_pid(key: &[u8]) -> PyResult<String> {
+        if key.len() != 32 {
+            return Err(PasetoKeyError::new_err(format!(
+                "Invalid key length for public key: expected 32 bytes, got {}",
+                key.len()
+            )));
+        }
+        let key_array: [u8; 32] = key
+            .try_into()
+            .map_err(|_| PasetoKeyError::new_err("Failed to convert key to array"))?;
+        Ok(PaserkId::generate_pid(&key_array))
+    }
+
     m.add_function(wrap_pyfunction!(generate_symmetric_key, m)?)?;
     m.add_function(wrap_pyfunction!(generate_keypair, m)?)?;
     m.add_function(wrap_pyfunction!(encode, m)?)?;
     m.add_function(wrap_pyfunction!(decode, m)?)?;
+    m.add_function(wrap_pyfunction!(to_paserk_local, m)?)?;
+    m.add_function(wrap_pyfunction!(to_paserk_secret, m)?)?;
+    m.add_function(wrap_pyfunction!(to_paserk_public, m)?)?;
+    m.add_function(wrap_pyfunction!(from_paserk, m)?)?;
+    m.add_function(wrap_pyfunction!(generate_lid, m)?)?;
+    m.add_function(wrap_pyfunction!(generate_sid, m)?)?;
+    m.add_function(wrap_pyfunction!(generate_pid, m)?)?;
 
     Ok(())
 }

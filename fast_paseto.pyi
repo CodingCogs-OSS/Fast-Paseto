@@ -246,3 +246,70 @@ def decode(
         PasetoError: If decoding fails
     """
     ...
+
+def to_paserk_local(key: bytes) -> str:
+    """Serialize a symmetric key to PASERK local format.
+
+    Converts a 32-byte symmetric key to the PASERK format: k4.local.{base64url_key}
+
+    Args:
+        key: A 32-byte symmetric key
+
+    Returns:
+        str: A PASERK-formatted string (e.g., "k4.local.AAAA...")
+
+    Raises:
+        PasetoKeyError: If the key is not exactly 32 bytes
+    """
+    ...
+
+def to_paserk_secret(key: bytes) -> str:
+    """Serialize an Ed25519 secret key to PASERK secret format.
+
+    Converts a 64-byte Ed25519 secret key to the PASERK format: k4.secret.{base64url_key}
+
+    Args:
+        key: A 64-byte Ed25519 secret key
+
+    Returns:
+        str: A PASERK-formatted string (e.g., "k4.secret.AAAA...")
+
+    Raises:
+        PasetoKeyError: If the key is not exactly 64 bytes
+    """
+    ...
+
+def to_paserk_public(key: bytes) -> str:
+    """Serialize an Ed25519 public key to PASERK public format.
+
+    Converts a 32-byte Ed25519 public key to the PASERK format: k4.public.{base64url_key}
+
+    Args:
+        key: A 32-byte Ed25519 public key
+
+    Returns:
+        str: A PASERK-formatted string (e.g., "k4.public.AAAA...")
+
+    Raises:
+        PasetoKeyError: If the key is not exactly 32 bytes
+    """
+    ...
+
+def from_paserk(paserk: str) -> tuple[str, bytes]:
+    """Deserialize a PASERK string back to key bytes.
+
+    Parses a PASERK-formatted string and returns the key bytes.
+    Supports k4.local, k4.secret, and k4.public formats.
+
+    Args:
+        paserk: A PASERK-formatted string (e.g., "k4.local.AAAA...")
+
+    Returns:
+        tuple[str, bytes]: A tuple of (key_type, key_bytes) where:
+            - key_type is "local", "secret", or "public"
+            - key_bytes is the decoded key (32 bytes for local/public, 64 bytes for secret)
+
+    Raises:
+        PasetoKeyError: If the PASERK format is invalid or unsupported
+    """
+    ...
