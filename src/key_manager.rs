@@ -64,6 +64,7 @@ pub enum PaserkKey {
 }
 
 /// PASERK key management for serialization and deserialization
+#[derive(Debug)]
 pub struct KeyManager;
 
 impl KeyManager {
@@ -1066,6 +1067,7 @@ impl KeyManager {
 ///
 /// PASERK (Platform-Agnostic Serialized Keys) IDs provide a deterministic
 /// way to identify keys without exposing the key material itself.
+#[derive(Debug)]
 pub struct PaserkId;
 
 impl PaserkId {

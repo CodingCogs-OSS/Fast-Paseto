@@ -22,9 +22,13 @@ use sha2::Sha384;
 use p384::ecdsa::{Signature as P384Signature, SigningKey as P384SigningKey, signature::Signer};
 
 // v2.local imports
-use chacha20poly1305::{XChaCha20Poly1305, aead::{Aead, Payload}};
+use chacha20poly1305::{
+    XChaCha20Poly1305,
+    aead::{Aead, Payload},
+};
 
 /// Token generation for all PASETO versions
+#[derive(Debug)]
 pub struct TokenGenerator;
 
 impl TokenGenerator {
@@ -90,12 +94,12 @@ impl TokenGenerator {
 
         // Build final token string
         let mut token = format!("v4.public.{}", encoded_payload);
-        if let Some(f) = footer {
-            if !f.is_empty() {
-                let encoded_footer = URL_SAFE_NO_PAD.encode(f);
-                token.push('.');
-                token.push_str(&encoded_footer);
-            }
+        if let Some(f) = footer
+            && !f.is_empty()
+        {
+            let encoded_footer = URL_SAFE_NO_PAD.encode(f);
+            token.push('.');
+            token.push_str(&encoded_footer);
         }
 
         Ok(token)
@@ -165,12 +169,12 @@ impl TokenGenerator {
 
         // Build final token string
         let mut token = format!("v2.public.{}", encoded_payload);
-        if let Some(f) = footer {
-            if !f.is_empty() {
-                let encoded_footer = URL_SAFE_NO_PAD.encode(f);
-                token.push('.');
-                token.push_str(&encoded_footer);
-            }
+        if let Some(f) = footer
+            && !f.is_empty()
+        {
+            let encoded_footer = URL_SAFE_NO_PAD.encode(f);
+            token.push('.');
+            token.push_str(&encoded_footer);
         }
 
         Ok(token)
@@ -236,12 +240,12 @@ impl TokenGenerator {
 
         // Build final token string
         let mut token = format!("v3.public.{}", encoded_payload);
-        if let Some(f) = footer {
-            if !f.is_empty() {
-                let encoded_footer = URL_SAFE_NO_PAD.encode(f);
-                token.push('.');
-                token.push_str(&encoded_footer);
-            }
+        if let Some(f) = footer
+            && !f.is_empty()
+        {
+            let encoded_footer = URL_SAFE_NO_PAD.encode(f);
+            token.push('.');
+            token.push_str(&encoded_footer);
         }
 
         Ok(token)
@@ -345,12 +349,12 @@ impl TokenGenerator {
 
         // Build final token string
         let mut token = format!("v4.local.{}", encoded_payload);
-        if let Some(f) = footer {
-            if !f.is_empty() {
-                let encoded_footer = URL_SAFE_NO_PAD.encode(f);
-                token.push('.');
-                token.push_str(&encoded_footer);
-            }
+        if let Some(f) = footer
+            && !f.is_empty()
+        {
+            let encoded_footer = URL_SAFE_NO_PAD.encode(f);
+            token.push('.');
+            token.push_str(&encoded_footer);
         }
 
         Ok(token)
@@ -442,12 +446,12 @@ impl TokenGenerator {
 
         // Build final token string
         let mut token = format!("v3.local.{}", encoded_payload);
-        if let Some(f) = footer {
-            if !f.is_empty() {
-                let encoded_footer = URL_SAFE_NO_PAD.encode(f);
-                token.push('.');
-                token.push_str(&encoded_footer);
-            }
+        if let Some(f) = footer
+            && !f.is_empty()
+        {
+            let encoded_footer = URL_SAFE_NO_PAD.encode(f);
+            token.push('.');
+            token.push_str(&encoded_footer);
         }
 
         Ok(token)
@@ -526,12 +530,12 @@ impl TokenGenerator {
 
         // Build final token string
         let mut token = format!("v2.local.{}", encoded_payload);
-        if let Some(f) = footer {
-            if !f.is_empty() {
-                let encoded_footer = URL_SAFE_NO_PAD.encode(f);
-                token.push('.');
-                token.push_str(&encoded_footer);
-            }
+        if let Some(f) = footer
+            && !f.is_empty()
+        {
+            let encoded_footer = URL_SAFE_NO_PAD.encode(f);
+            token.push('.');
+            token.push_str(&encoded_footer);
         }
 
         Ok(token)

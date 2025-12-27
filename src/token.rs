@@ -132,7 +132,7 @@ impl Token {
         let payload_dict = self.payload.bind(py).cast::<PyDict>()?;
 
         // Check if the key exists
-        Ok(payload_dict.contains(key)?)
+        payload_dict.contains(key)
     }
 
     /// Convert token to a dictionary representation

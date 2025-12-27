@@ -29,6 +29,7 @@ pub struct P384KeyPair {
 }
 
 /// Cryptographic key generation
+#[derive(Debug)]
 pub struct KeyGenerator;
 
 impl KeyGenerator {
@@ -107,8 +108,6 @@ impl KeyGenerator {
     /// assert_eq!(keypair.public_key.len(), 49);
     /// ```
     pub fn generate_p384_keypair() -> P384KeyPair {
-        use p384::elliptic_curve::sec1::ToEncodedPoint;
-
         let signing_key = P384SigningKey::random(&mut OsRng);
         let verifying_key = signing_key.verifying_key();
 
@@ -193,6 +192,8 @@ impl KeyGenerator {
 mod tests {
     use super::*;
     use ed25519_dalek::{Signer, VerifyingKey};
+    #[allow(unused_imports)]
+    use p384::elliptic_curve::sec1::ToEncodedPoint;
     use proptest::prelude::*;
 
     #[test]
@@ -486,7 +487,6 @@ mod tests {
         let verifying_key = P384VerifyingKey::from(&public_key);
 
         // Verify that the public key from the signing key matches our stored public key
-        use p384::elliptic_curve::sec1::ToEncodedPoint;
         let derived_public = signing_key.verifying_key().to_encoded_point(true);
         assert_eq!(
             derived_public.as_bytes(),

@@ -209,6 +209,7 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
     ///     >>> token = fast_paseto.encode(key, payload, serializer=json)
     #[pyfunction]
     #[pyo3(signature = (key, payload, purpose="local", version="v4", footer=None, implicit_assertion=None, serializer=None))]
+    #[allow(clippy::too_many_arguments)]
     fn encode(
         py: Python<'_>,
         key: &Bound<'_, PyAny>,
@@ -222,8 +223,8 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
         use pyo3::types::{PyBytes, PyDict, PyString};
 
         // Parse version and purpose
-        let version_enum = Version::from_str(version)?;
-        let purpose_enum = Purpose::from_str(purpose)?;
+        let version_enum: Version = version.parse()?;
+        let purpose_enum: Purpose = purpose.parse()?;
 
         // Convert key to bytes
         let key_bytes = if let Ok(bytes) = key.cast::<PyBytes>() {
@@ -366,11 +367,7 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
                     .try_into()
                     .map_err(|_| PasetoKeyError::new_err("Failed to convert key to array"))?;
                 // v2 does not support implicit assertions
-                TokenGenerator::v2_public_sign(
-                    &key_array,
-                    &payload_bytes,
-                    footer_bytes.as_deref(),
-                )?
+                TokenGenerator::v2_public_sign(&key_array, &payload_bytes, footer_bytes.as_deref())?
             }
             _ => {
                 return Err(PasetoValidationError::new_err(format!(
@@ -427,6 +424,7 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
     ///     >>> token = fast_paseto.decode(token_str, key, deserializer=json)
     #[pyfunction]
     #[pyo3(signature = (token, key, purpose="local", version="v4", footer=None, implicit_assertion=None, deserializer=None, leeway=0))]
+    #[allow(clippy::too_many_arguments)]
     fn decode(
         py: Python<'_>,
         token: &str,
@@ -442,8 +440,8 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
         use pyo3::types::{PyBytes, PyDict, PyString};
 
         // Parse version and purpose
-        let version_enum = Version::from_str(version)?;
-        let purpose_enum = Purpose::from_str(purpose)?;
+        let version_enum: Version = version.parse()?;
+        let purpose_enum: Purpose = purpose.parse()?;
 
         // Convert key to bytes
         let key_bytes = if let Ok(bytes) = key.cast::<PyBytes>() {
@@ -565,11 +563,7 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
                     .try_into()
                     .map_err(|_| PasetoKeyError::new_err("Failed to convert key to array"))?;
                 // v2 does not support implicit assertions
-                verifier.v2_local_decrypt(
-                    token,
-                    &key_array,
-                    footer_bytes.as_deref(),
-                )?
+                verifier.v2_local_decrypt(token, &key_array, footer_bytes.as_deref())?
             }
             (Version::V2, Purpose::Public) => {
                 // v2.public requires 32-byte public key
@@ -583,11 +577,7 @@ fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
                     .try_into()
                     .map_err(|_| PasetoKeyError::new_err("Failed to convert key to array"))?;
                 // v2 does not support implicit assertions
-                verifier.v2_public_verify(
-                    token,
-                    &key_array,
-                    footer_bytes.as_deref(),
-                )?
+                verifier.v2_public_verify(token, &key_array, footer_bytes.as_deref())?
             }
             _ => {
                 return Err(PasetoValidationError::new_err(format!(

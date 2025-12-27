@@ -26,11 +26,16 @@ use hmac::Hmac;
 use sha2::Sha384;
 
 // v2.local imports
-use chacha20poly1305::{XChaCha20Poly1305, aead::{Aead, Payload}};
+use chacha20poly1305::{
+    XChaCha20Poly1305,
+    aead::{Aead, Payload},
+};
 
 /// Token verification and decryption
+#[derive(Debug)]
 pub struct TokenVerifier {
     /// Seconds of tolerance for time-based claims
+    #[allow(dead_code)]
     leeway: u64,
 }
 

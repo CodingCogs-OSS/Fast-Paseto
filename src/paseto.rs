@@ -124,6 +124,7 @@ impl Paseto {
     ///     >>> import json
     ///     >>> token = paseto.encode(key, payload, serializer=json)
     #[pyo3(signature = (key, payload, purpose="local", version="v4", footer=None, implicit_assertion=None, serializer=None))]
+    #[allow(clippy::too_many_arguments)]
     fn encode(
         &self,
         py: Python<'_>,
@@ -136,8 +137,8 @@ impl Paseto {
         serializer: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<String> {
         // Parse version and purpose
-        let version_enum = Version::from_str(version)?;
-        let purpose_enum = Purpose::from_str(purpose)?;
+        let version_enum: Version = version.parse()?;
+        let purpose_enum: Purpose = purpose.parse()?;
 
         // Convert key to bytes
         let key_bytes = if let Ok(bytes) = key.cast::<PyBytes>() {
@@ -164,12 +165,12 @@ impl Paseto {
             let new_dict = dict.copy()?;
 
             // Apply default_exp if configured and not already present
-            if let Some(exp_seconds) = self.default_exp {
-                if !new_dict.contains("exp")? {
-                    let now = ClaimsManager::now();
-                    let exp = now + exp_seconds;
-                    new_dict.set_item("exp", exp)?;
-                }
+            if let Some(exp_seconds) = self.default_exp
+                && !new_dict.contains("exp")?
+            {
+                let now = ClaimsManager::now();
+                let exp = now + exp_seconds;
+                new_dict.set_item("exp", exp)?;
             }
 
             // Apply include_iat if configured and not already present
@@ -298,11 +299,7 @@ impl Paseto {
                     .try_into()
                     .map_err(|_| PasetoKeyError::new_err("Failed to convert key to array"))?;
                 // v2 does not support implicit assertions
-                TokenGenerator::v2_public_sign(
-                    &key_array,
-                    &payload_bytes,
-                    footer_bytes.as_deref(),
-                )?
+                TokenGenerator::v2_public_sign(&key_array, &payload_bytes, footer_bytes.as_deref())?
             }
             _ => {
                 return Err(PasetoValidationError::new_err(format!(
@@ -314,7 +311,6 @@ impl Paseto {
 
         Ok(token)
     }
-
 
     /// Decode a PASETO token with configured leeway
     ///
@@ -345,6 +341,7 @@ impl Paseto {
     ///     >>> import json
     ///     >>> decoded = paseto.decode(token_str, key, deserializer=json)
     #[pyo3(signature = (token, key, purpose="local", version="v4", footer=None, implicit_assertion=None, deserializer=None))]
+    #[allow(clippy::too_many_arguments)]
     fn decode(
         &self,
         py: Python<'_>,
@@ -359,8 +356,8 @@ impl Paseto {
         use base64::prelude::*;
 
         // Parse version and purpose
-        let version_enum = Version::from_str(version)?;
-        let purpose_enum = Purpose::from_str(purpose)?;
+        let version_enum: Version = version.parse()?;
+        let purpose_enum: Purpose = purpose.parse()?;
 
         // Convert key to bytes
         let key_bytes = if let Ok(bytes) = key.cast::<PyBytes>() {

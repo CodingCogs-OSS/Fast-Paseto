@@ -36,6 +36,7 @@ use crate::error::PasetoError;
 ///
 /// Provides static methods for creating and validating time-based claims
 /// such as expiration, not-before, and issued-at timestamps.
+#[derive(Debug)]
 pub struct ClaimsManager;
 
 impl ClaimsManager {
