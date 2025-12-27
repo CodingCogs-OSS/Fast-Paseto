@@ -39,5 +39,8 @@ thiserror = "2.0"
 # Password-based key derivation
 argon2 = "0.5"
 
+# String Pattern matching
+aho-corasick = "1.1.4"
+
 [dev-dependencies]
 proptest = "1.5"
