@@ -1,8 +1,41 @@
+//! Claims management utilities for PASETO tokens
+//!
+//! This module provides utilities for managing time-based claims in PASETO tokens,
+//! including expiration (`exp`), not-before (`nbf`), and issued-at (`iat`) claims.
+//!
+//! # Overview
+//!
+//! PASETO tokens can include standard claims that control when a token is valid:
+//! - `exp` (expiration): The time after which the token is no longer valid
+//! - `nbf` (not before): The time before which the token is not yet valid
+//! - `iat` (issued at): The time when the token was issued
+//!
+//! # Leeway
+//!
+//! All validation functions accept a `leeway` parameter to account for clock skew
+//! between systems. This allows tokens to be accepted even if clocks are slightly
+//! out of sync.
+//!
+//! # Example
+//!
+//! ```rust
+//! use fast_paseto::ClaimsManager;
+//!
+//! // Create an expiration claim 1 hour from now
+//! let exp = ClaimsManager::exp_in(3600);
+//!
+//! // Validate the expiration with 30 seconds of leeway
+//! assert!(ClaimsManager::validate_exp(exp, 30).is_ok());
+//! ```
+
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::error::PasetoError;
 
-/// Claims management utilities
+/// Claims management utilities for time-based token validation
+///
+/// Provides static methods for creating and validating time-based claims
+/// such as expiration, not-before, and issued-at timestamps.
 pub struct ClaimsManager;
 
 impl ClaimsManager {
