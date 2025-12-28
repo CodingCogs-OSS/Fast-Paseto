@@ -5,7 +5,7 @@ edition = "2024"
 
 [lib]
 name = "fast_paseto"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 pyo3 = "0.27.0"
@@ -44,3 +44,7 @@ aho-corasick = "1.1.4"
 
 [dev-dependencies]
 proptest = "1.5"
+
+[[test]]
+name = "property_tests"
+path = "tests/rust/property_tests.rs"
