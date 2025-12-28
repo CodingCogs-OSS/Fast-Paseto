@@ -63,3 +63,8 @@ required-features = ["test-vectors"]
 name = "v4_vectors"
 path = "tests/rust/v4_vectors.rs"
 required-features = ["test-vectors"]
+
+[[test]]
+name = "v2_vectors"
+path = "tests/rust/v2_vectors.rs"
+required-features = ["test-vectors"]
