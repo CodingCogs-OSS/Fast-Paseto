@@ -4,69 +4,61 @@ inclusion: always
 
 # Technology Stack
 
-## Core Technologies
-- **Rust (Edition 2024)**: All cryptographic operations and core logic
-- **Python 3.11+**: User-facing API via PyO3 bindings
-- **PyO3 0.27.0**: Rust-Python FFI layer
-- **Maturin**: Build tool for PyO3 projects (bridges Cargo and Python packaging)
+## Core Stack
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| Rust | Edition 2024 | Cryptographic operations, core logic |
+| Python | 3.11+ | User-facing API |
+| PyO3 | 0.27.0 | Rust-Python FFI bindings |
+| Maturin | latest | Build tool (bridges Cargo + Python packaging) |
 
-## Critical Build Rules
-- After ANY Rust code changes in `src/`, run `maturin develop` to rebuild the extension
-- Python has NO runtime dependencies - this is a pure Rust extension module
-- Use `uv` for Python environment management (not pip/venv directly)
-- Windows users: Use `.venv\Scripts\activate` instead of `source .venv/bin/activate`
+## Critical Rules
 
-## Development Workflow
+### Build Requirements
+- **ALWAYS** run `maturin develop` after ANY change to `src/*.rs` files
+- Python has ZERO runtime dependencies — pure Rust extension only
+- Use `uv` for Python environment management (not pip/venv)
+- Windows activation: `.venv\Scripts\activate` (not `source`)
 
-### Initial Setup
+### Cryptographic Constraints
+- ALL crypto operations MUST remain in Rust — never implement in Python
+- v4.local: XChaCha20-Poly1305 + BLAKE2b-MAC (32-byte symmetric key)
+- v4.public: Ed25519 signatures (64-byte secret, 32-byte public key)
+- Key lengths validated at runtime — incorrect sizes raise errors
+
+## Command Reference
+
+### Setup
 ```bash
-uv venv
-.venv\Scripts\activate  # Windows
-maturin develop
+uv venv && .venv\Scripts\activate && maturin develop
 ```
 
-### After Modifying Rust Code
+### After Rust Changes
 ```bash
-maturin develop  # Required to see changes in Python
-pytest           # Verify changes work
+maturin develop && pytest
 ```
 
-### Before Committing
+### Pre-Commit Checks
 ```bash
-cargo fmt        # Format Rust code
-cargo clippy     # Lint Rust code
-ruff format .    # Format Python code
-ruff check .     # Lint Python code
-uvx ty check     # Type check Python stubs
-cargo test       # Run Rust unit tests
-pytest           # Run Python integration tests
+cargo fmt && cargo clippy && ruff format . && ruff check . && uvx ty check && cargo test && pytest
 ```
 
-Or use pre-commit hooks:
-```bash
-pre-commit run --all-files
-```
+Or: `pre-commit run --all-files`
 
-## Testing Strategy
-- **Rust tests** (`cargo test`): Unit tests for internal logic, run in Rust
-- **Python tests** (`pytest`): Integration tests for Python API, require `maturin develop` first
-- Never skip `maturin develop` before running pytest - tests will fail with import errors
-- Pre-commit runs pytest on pre-push (not pre-commit) to avoid slow commits
+## Testing
 
-## Code Quality Tools
-- **Rust**: `cargo fmt` (formatting), `cargo clippy` (linting)
-- **Python**: `ruff format` (formatting), `ruff check` (linting), `uvx ty` (type checking)
-- All configured in `.pre-commit-config.yaml` with auto-fix enabled where safe
+| Test Type | Command | Requires |
+|-----------|---------|----------|
+| Rust unit tests | `cargo test` | Nothing |
+| Python integration | `pytest` | `maturin develop` first |
 
-## Cryptographic Standards (PASETO v4)
-- **v4.local**: XChaCha20-Poly1305 encryption + BLAKE2b-MAC (32-byte symmetric key)
-- **v4.public**: Ed25519 signatures (64-byte secret key, 32-byte public key)
-- All crypto operations MUST stay in Rust - never implement in Python
-- Key lengths are validated at runtime - incorrect sizes will error
+Pre-commit runs pytest on **pre-push** (not pre-commit) to avoid slow commits.
 
-## Common Pitfalls
-- Forgetting `maturin develop` after Rust changes (most common error)
-- Using `pip install -e .` instead of `maturin develop` (won't work)
-- Trying to run pytest without building the extension first
-- Adding Python runtime dependencies (violates pure-extension design)
-- Implementing crypto in Python instead of Rust (security risk)
+## Common Errors
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `ImportError: cannot import name` | Missing rebuild | Run `maturin develop` |
+| `pip install -e .` fails | Wrong build tool | Use `maturin develop` |
+| Python runtime dep added | Violates design | Remove from `[project.dependencies]` |
+| Crypto implemented in Python | Security risk | Move to Rust in `src/` |
