@@ -82,6 +82,10 @@ pub mod token_generator;
 pub mod token_verifier;
 pub mod version;
 
+// Test vector support (used in tests)
+#[cfg(any(test, feature = "test-vectors"))]
+pub mod test_vectors;
+
 pub use claims_manager::ClaimsManager;
 pub use error::PasetoError;
 pub use exceptions::{

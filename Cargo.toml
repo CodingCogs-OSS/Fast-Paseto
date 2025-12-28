@@ -3,6 +3,9 @@ name = "fast-paseto"
 version = "0.0.1"
 edition = "2024"
 
+[features]
+test-vectors = []
+
 [lib]
 name = "fast_paseto"
 crate-type = ["cdylib", "rlib"]
@@ -32,6 +35,8 @@ hkdf = "0.12"
 base64 = "0.22"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+hex = "0.4"
+pem = "3.0"
 
 # Error handling
 thiserror = "2.0"
@@ -48,3 +53,7 @@ proptest = "1.5"
 [[test]]
 name = "property_tests"
 path = "tests/rust/property_tests.rs"
+
+[[test]]
+name = "test_vector_loader"
+path = "tests/rust/test_vector_loader.rs"
