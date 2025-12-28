@@ -58,3 +58,8 @@ path = "tests/rust/property_tests.rs"
 name = "test_vector_loader"
 path = "tests/rust/test_vector_loader.rs"
 required-features = ["test-vectors"]
+
+[[test]]
+name = "v4_vectors"
+path = "tests/rust/v4_vectors.rs"
+required-features = ["test-vectors"]

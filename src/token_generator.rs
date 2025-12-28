@@ -380,8 +380,8 @@ impl TokenGenerator {
     ///
     /// # Safety
     /// This method is only available in test builds. Never use fixed nonces in production!
-    #[cfg(test)]
-    pub(crate) fn v4_local_encrypt_with_nonce(
+    #[cfg(any(test, feature = "test-vectors"))]
+    pub fn v4_local_encrypt_with_nonce(
         key: &[u8],
         payload: &[u8],
         footer: Option<&[u8]>,
@@ -589,8 +589,8 @@ impl TokenGenerator {
     ///
     /// # Safety
     /// This method is only available in test builds. Never use fixed nonces in production!
-    #[cfg(test)]
-    pub(crate) fn v3_local_encrypt_with_nonce(
+    #[cfg(any(test, feature = "test-vectors"))]
+    pub fn v3_local_encrypt_with_nonce(
         key: &[u8],
         payload: &[u8],
         footer: Option<&[u8]>,
@@ -774,8 +774,8 @@ impl TokenGenerator {
     ///
     /// # Note
     /// v2 does NOT support implicit assertions (unlike v3/v4)
-    #[cfg(test)]
-    pub(crate) fn v2_local_encrypt_with_nonce(
+    #[cfg(any(test, feature = "test-vectors"))]
+    pub fn v2_local_encrypt_with_nonce(
         key: &[u8],
         payload: &[u8],
         footer: Option<&[u8]>,

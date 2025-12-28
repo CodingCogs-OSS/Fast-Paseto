@@ -194,7 +194,14 @@ impl TestVector {
             return Ok(Vec::new());
         }
 
-        Self::decode_hex(&self.implicit_assertion)
+        // Try hex decoding first
+        match Self::decode_hex(&self.implicit_assertion) {
+            Ok(bytes) => Ok(bytes),
+            Err(_) => {
+                // Not hex, treat as UTF-8 string (JSON)
+                Ok(self.implicit_assertion.as_bytes().to_vec())
+            }
+        }
     }
 
     /// Load PEM-encoded key
