@@ -6,6 +6,7 @@
 //! Format: LE64(count) || LE64(len(p1)) || p1 || LE64(len(p2)) || p2 || ...
 
 /// Pre-Authentication Encoding implementation
+#[derive(Debug)]
 pub struct Pae;
 
 impl Pae {

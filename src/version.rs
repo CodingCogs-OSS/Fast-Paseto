@@ -3,6 +3,7 @@
 //! This module defines the Version and Purpose enums for PASETO tokens.
 
 use crate::error::PasetoError;
+use std::str::FromStr;
 
 /// PASETO version
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,9 +22,12 @@ impl Version {
             Version::V4 => "v4",
         }
     }
+}
 
-    /// Parse version from string
-    pub fn from_str(s: &str) -> Result<Self, PasetoError> {
+impl FromStr for Version {
+    type Err = PasetoError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "v2" => Ok(Version::V2),
             "v3" => Ok(Version::V3),
@@ -54,9 +58,12 @@ impl Purpose {
             Purpose::Public => "public",
         }
     }
+}
 
-    /// Parse purpose from string
-    pub fn from_str(s: &str) -> Result<Self, PasetoError> {
+impl FromStr for Purpose {
+    type Err = PasetoError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "local" => Ok(Purpose::Local),
             "public" => Ok(Purpose::Public),

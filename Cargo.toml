@@ -3,9 +3,12 @@ name = "fast-paseto"
 version = "0.0.1"
 edition = "2024"
 
+[features]
+test-vectors = []
+
 [lib]
 name = "fast_paseto"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 pyo3 = "0.27.0"
@@ -13,6 +16,7 @@ pyo3 = "0.27.0"
 # Cryptographic primitives
 blake2 = "0.10"
 chacha20 = "0.9"
+chacha20poly1305 = "0.10"
 ed25519-dalek = { version = "2.1", features = ["rand_core", "pkcs8", "pem"] }
 rand = "0.8"
 subtle = "2.5"  # Constant-time comparisons
@@ -31,6 +35,8 @@ hkdf = "0.12"
 base64 = "0.22"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+hex = "0.4"
+pem = "3.0"
 
 # Error handling
 thiserror = "2.0"
@@ -38,5 +44,37 @@ thiserror = "2.0"
 # Password-based key derivation
 argon2 = "0.5"
 
+# String Pattern matching
+aho-corasick = "1.1.4"
+
 [dev-dependencies]
 proptest = "1.5"
+
+[[test]]
+name = "property_tests"
+path = "tests/rust/property_tests.rs"
+
+[[test]]
+name = "test_vector_loader"
+path = "tests/rust/test_vector_loader.rs"
+required-features = ["test-vectors"]
+
+[[test]]
+name = "v4_vectors"
+path = "tests/rust/v4_vectors.rs"
+required-features = ["test-vectors"]
+
+[[test]]
+name = "v2_vectors"
+path = "tests/rust/v2_vectors.rs"
+required-features = ["test-vectors"]
+
+[[test]]
+name = "v3_vectors"
+path = "tests/rust/v3_vectors.rs"
+required-features = ["test-vectors"]
+
+[[test]]
+name = "test_vector_property_tests"
+path = "tests/rust/test_vector_property_tests.rs"
+required-features = ["test-vectors"]
