@@ -11,6 +11,23 @@ A high-performance [PASETO](https://paseto.io/) (Platform-Agnostic Security Toke
 - **PASERK support** — Key serialization, wrapping, and password protection
 - **PEM key loading** — Import Ed25519 keys from standard PEM format
 
+## Performance
+
+Benchmarked against [pyseto](https://github.com/dajiaji/pyseto), the most popular Python PASETO library.
+
+| Operation | fast-paseto | pyseto | Speedup |
+|-----------|-------------|--------|---------|
+| generate_symmetric_key | 0.2 µs | 1.1 µs | 6x |
+| generate_keypair | 16 µs | 80 µs | 5x |
+| v4.local encode | 5 µs | 16 µs | 3x |
+| v4.local decode | 5 µs | 18 µs | 3.5x |
+| v4.public encode (sign) | 43 µs | 41 µs | ~1x |
+| v4.public decode (verify) | 37 µs | 98 µs | 2.7x |
+
+Note: [python-paseto](https://github.com/purificant/python-paseto) requires libsodium and was excluded from benchmarks.
+
+Run benchmarks yourself: `python profiling/benchmark.py`
+
 ## Installation
 
 ```bash

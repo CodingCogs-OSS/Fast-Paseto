@@ -45,3 +45,6 @@ htmlcov/
 
 # Kiro
 .kiro/specs/
+
+# Profiling
+profiling/
