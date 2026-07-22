@@ -39,6 +39,7 @@ Thumbs.db
 .coverage
 htmlcov/
 .tox/
+.hypothesis/
 
 # Maturin
 *.whl
