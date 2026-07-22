@@ -1,36 +1,53 @@
----
-inclusion: always
----
-
 # Technology Stack
 
 ## Core Stack
+
 | Technology | Version | Purpose |
 |------------|---------|---------|
-| Rust | Edition 2024 | Cryptographic operations, core logic |
+| Rust | Edition 2024 | All cryptographic operations and core logic |
 | Python | 3.11+ | User-facing API |
-| PyO3 | 0.27.0 | Rust-Python FFI bindings |
-| Maturin | latest | Build tool (bridges Cargo + Python packaging) |
+| PyO3 | 0.27.0 | Rust ↔ Python FFI bindings |
+| Maturin | >=1.10,<2.0 | Build tool (bridges Cargo + Python packaging) |
+| uv | latest | Python environment & dependency management |
+
+Crate type is `["cdylib", "rlib"]`; the module is named `fast_paseto`.
+
+## Key Rust Dependencies
+
+- Crypto: `chacha20poly1305`, `chacha20`, `blake2`, `ed25519-dalek`, `p384` (ECDSA), `aes`, `ctr`, `hmac`, `hkdf`, `sha2`, `argon2`, `subtle` (constant-time compares).
+- Encoding/serialization: `base64`, `hex`, `pem`, `serde`, `serde_json`.
+- Errors: `thiserror`.
+- Dev/test: `proptest` (property tests).
 
 ## Critical Rules
 
-### Build Requirements
-- **ALWAYS** run `maturin develop` after ANY change to `src/*.rs` files
-- Python has ZERO runtime dependencies — pure Rust extension only
-- Use `uv` for Python environment management (not pip/venv)
-- Windows activation: `.venv\Scripts\activate` (not `source`)
+### Build
+- **ALWAYS run `maturin develop` after ANY change to `src/*.rs`** — otherwise Python imports use a stale build (`ImportError`).
+- Use `uv` for the Python environment (not raw pip/venv). Never use `pip install -e .` (wrong build tool).
+- Windows activation: `.venv\Scripts\activate`.
 
 ### Cryptographic Constraints
-- ALL crypto operations MUST remain in Rust — never implement in Python
-- v4.local: XChaCha20-Poly1305 + BLAKE2b-MAC (32-byte symmetric key)
-- v4.public: Ed25519 signatures (64-byte secret, 32-byte public key)
-- Key lengths validated at runtime — incorrect sizes raise errors
+- ALL crypto MUST stay in Rust — never implement crypto in Python.
+- Validate key lengths at runtime; incorrect sizes must raise `PasetoKeyError`.
+- Use constant-time comparisons (`subtle`) for sensitive data.
+
+### Dependency Placement
+| Dependency Type | File | Section |
+|-----------------|------|---------|
+| Rust runtime | `Cargo.toml` | `[dependencies]` |
+| Rust dev/test | `Cargo.toml` | `[dev-dependencies]` |
+| Python dev/test | `pyproject.toml` | `[dependency-groups] dev` |
+| Build tools | `pyproject.toml` | `[build-system] requires` |
+
+Keep Python runtime dependencies (`[project] dependencies`) minimal — this is a pure Rust extension. Test-only tools like `hypothesis` belong with the dev tooling, not runtime.
 
 ## Command Reference
 
 ### Setup
 ```bash
-uv venv && .venv\Scripts\activate && maturin develop
+uv venv
+.venv\Scripts\activate
+maturin develop
 ```
 
 ### After Rust Changes
@@ -38,27 +55,33 @@ uv venv && .venv\Scripts\activate && maturin develop
 maturin develop && pytest
 ```
 
-### Pre-Commit Checks
+### Test Vectors (feature-gated)
+Rust test-vector suites require the `test-vectors` feature:
+```bash
+cargo test --features test-vectors
+```
+
+### Pre-Commit / Full Checks
 ```bash
 cargo fmt && cargo clippy && ruff format . && ruff check . && uvx ty check && cargo test && pytest
 ```
-
 Or: `pre-commit run --all-files`
 
 ## Testing
 
 | Test Type | Command | Requires |
 |-----------|---------|----------|
-| Rust unit tests | `cargo test` | Nothing |
-| Python integration | `pytest` | `maturin develop` first |
+| Rust unit/property tests | `cargo test` | Nothing |
+| Rust test-vector suites | `cargo test --features test-vectors` | Nothing |
+| Python integration tests | `pytest` | `maturin develop` first |
 
-Pre-commit runs pytest on **pre-push** (not pre-commit) to avoid slow commits.
+Property tests use `proptest` (Rust) and `hypothesis` (Python). Pytest runs on **pre-push** (not pre-commit) to keep commits fast.
 
 ## Common Errors
 
 | Error | Cause | Fix |
 |-------|-------|-----|
-| `ImportError: cannot import name` | Missing rebuild | Run `maturin develop` |
+| `ImportError: cannot import name` | Missing rebuild | `maturin develop` |
 | `pip install -e .` fails | Wrong build tool | Use `maturin develop` |
-| Python runtime dep added | Violates design | Remove from `[project.dependencies]` |
-| Crypto implemented in Python | Security risk | Move to Rust in `src/` |
+| Type stub mismatch | `fast_paseto.pyi` out of sync | Update stub, run `uvx ty check` |
+| Crypto added in Python | Security/design violation | Move to Rust in `src/` |
