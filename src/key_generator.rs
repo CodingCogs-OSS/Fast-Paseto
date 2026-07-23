@@ -195,6 +195,9 @@ mod tests {
     #[allow(unused_imports)]
     use p384::elliptic_curve::sec1::ToEncodedPoint;
     use proptest::prelude::*;
+    // Disambiguate `RngCore` (brought in by both `super::*` and
+    // `proptest::prelude::*`) so `.fill_bytes` resolves unambiguously.
+    use rand::RngCore;
 
     #[test]
     fn test_generate_symmetric_key_length() {
