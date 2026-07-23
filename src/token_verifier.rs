@@ -933,7 +933,7 @@ mod tests {
     fn test_v4_local_decrypt_payload_too_short() {
         let key = [0u8; 32];
         // Create a token with payload shorter than 64 bytes
-        let short_payload = URL_SAFE_NO_PAD.encode(&[0u8; 32]); // Only 32 bytes
+        let short_payload = URL_SAFE_NO_PAD.encode([0u8; 32]); // Only 32 bytes
         let token = format!("v4.local.{}", short_payload);
 
         let verifier = TokenVerifier::new(None);
@@ -1146,7 +1146,7 @@ mod tests {
     fn test_v3_local_decrypt_payload_too_short() {
         let key = [0u8; 32];
         // Create a token with payload shorter than 80 bytes (32 nonce + 48 tag)
-        let short_payload = URL_SAFE_NO_PAD.encode(&[0u8; 64]); // Only 64 bytes
+        let short_payload = URL_SAFE_NO_PAD.encode([0u8; 64]); // Only 64 bytes
         let token = format!("v3.local.{}", short_payload);
 
         let verifier = TokenVerifier::new(None);
@@ -1405,7 +1405,7 @@ mod tests {
 
         let keypair = KeyGenerator::generate_ed25519_keypair();
         // Create a token with payload shorter than 64 bytes
-        let short_payload = URL_SAFE_NO_PAD.encode(&[0u8; 32]); // Only 32 bytes
+        let short_payload = URL_SAFE_NO_PAD.encode([0u8; 32]); // Only 32 bytes
         let token = format!("v4.public.{}", short_payload);
 
         let verifier = TokenVerifier::new(None);
@@ -1666,7 +1666,7 @@ mod tests {
 
         let keypair = KeyGenerator::generate_p384_keypair();
         // Create a token with payload shorter than 96 bytes
-        let short_payload = URL_SAFE_NO_PAD.encode(&[0u8; 48]); // Only 48 bytes
+        let short_payload = URL_SAFE_NO_PAD.encode([0u8; 48]); // Only 48 bytes
         let token = format!("v3.public.{}", short_payload);
 
         let verifier = TokenVerifier::new(None);
@@ -1925,7 +1925,7 @@ mod tests {
 
         let keypair = KeyGenerator::generate_ed25519_keypair();
         // Create a token with payload shorter than 64 bytes
-        let short_payload = URL_SAFE_NO_PAD.encode(&[0u8; 32]); // Only 32 bytes
+        let short_payload = URL_SAFE_NO_PAD.encode([0u8; 32]); // Only 32 bytes
         let token = format!("v2.public.{}", short_payload);
 
         let verifier = TokenVerifier::new(None);
@@ -2119,7 +2119,7 @@ mod tests {
     fn test_v2_local_decrypt_payload_too_short() {
         let key = [0u8; 32];
         // Create a token with payload shorter than 40 bytes (24 nonce + 16 tag)
-        let short_payload = URL_SAFE_NO_PAD.encode(&[0u8; 32]); // Only 32 bytes
+        let short_payload = URL_SAFE_NO_PAD.encode([0u8; 32]); // Only 32 bytes
         let token = format!("v2.local.{}", short_payload);
 
         let verifier = TokenVerifier::new(None);

@@ -3,15 +3,14 @@
 //! This module validates the fast-paseto implementation against official test vectors
 //! from https://github.com/paseto-standard/test-vectors
 
-use fast_paseto::test_vectors::{TestVectorFile, TestVector};
+use fast_paseto::test_vectors::{TestVector, TestVectorFile};
 use fast_paseto::token_verifier::TokenVerifier;
 use std::path::Path;
 
 /// Load v2 test vectors from file
 fn load_v2_vectors() -> TestVectorFile {
     let path = Path::new("tests/vectors/v2.json");
-    TestVectorFile::load_from_file(path)
-        .expect("Failed to load v2.json test vectors")
+    TestVectorFile::load_from_file(path).expect("Failed to load v2.json test vectors")
 }
 
 #[test]
@@ -38,7 +37,10 @@ fn test_v2_public_test_vectors_load() {
         .filter(|v| v.token.starts_with("v2.public."))
         .collect();
 
-    assert!(!public_vectors.is_empty(), "No v2.public test vectors found");
+    assert!(
+        !public_vectors.is_empty(),
+        "No v2.public test vectors found"
+    );
     println!("Loaded {} v2.public test vectors", public_vectors.len());
 }
 
@@ -60,20 +62,33 @@ fn test_v2_local_decryption_success() {
     );
 
     for vector in local_success_vectors {
-        let key = vector.key_bytes()
-            .unwrap_or_else(|e| panic!("Test vector '{}': Failed to decode key: {}", vector.name, e));
+        let key = vector.key_bytes().unwrap_or_else(|e| {
+            panic!("Test vector '{}': Failed to decode key: {}", vector.name, e)
+        });
 
-        let expected_payload = vector.payload_bytes()
-            .unwrap_or_else(|e| panic!("Test vector '{}': Failed to decode payload: {}", vector.name, e));
+        let expected_payload = vector.payload_bytes().unwrap_or_else(|e| {
+            panic!(
+                "Test vector '{}': Failed to decode payload: {}",
+                vector.name, e
+            )
+        });
 
-        let footer = vector.footer_bytes()
-            .unwrap_or_else(|e| panic!("Test vector '{}': Failed to decode footer: {}", vector.name, e));
+        let footer = vector.footer_bytes().unwrap_or_else(|e| {
+            panic!(
+                "Test vector '{}': Failed to decode footer: {}",
+                vector.name, e
+            )
+        });
 
         // Decrypt the token
         let result = verifier.v2_local_decrypt(
             &vector.token,
             &key,
-            if footer.is_empty() { None } else { Some(&footer) },
+            if footer.is_empty() {
+                None
+            } else {
+                Some(&footer)
+            },
         );
 
         assert!(
@@ -85,7 +100,8 @@ fn test_v2_local_decryption_success() {
 
         let actual_payload = result.unwrap();
         assert_eq!(
-            actual_payload, expected_payload,
+            actual_payload,
+            expected_payload,
             "Test vector '{}': Payload mismatch.\nExpected: {:?}\nActual: {:?}",
             vector.name,
             String::from_utf8_lossy(&expected_payload),
@@ -112,17 +128,26 @@ fn test_v2_local_decryption_failure() {
     );
 
     for vector in local_failure_vectors {
-        let key = vector.key_bytes()
-            .unwrap_or_else(|e| panic!("Test vector '{}': Failed to decode key: {}", vector.name, e));
+        let key = vector.key_bytes().unwrap_or_else(|e| {
+            panic!("Test vector '{}': Failed to decode key: {}", vector.name, e)
+        });
 
-        let footer = vector.footer_bytes()
-            .unwrap_or_else(|e| panic!("Test vector '{}': Failed to decode footer: {}", vector.name, e));
+        let footer = vector.footer_bytes().unwrap_or_else(|e| {
+            panic!(
+                "Test vector '{}': Failed to decode footer: {}",
+                vector.name, e
+            )
+        });
 
         // Attempt to decrypt the token - should fail
         let result = verifier.v2_local_decrypt(
             &vector.token,
             &key,
-            if footer.is_empty() { None } else { Some(&footer) },
+            if footer.is_empty() {
+                None
+            } else {
+                Some(&footer)
+            },
         );
 
         assert!(
@@ -142,11 +167,7 @@ fn test_v2_local_footer_validation() {
     let local_footer_vectors: Vec<&TestVector> = vectors
         .tests
         .iter()
-        .filter(|v| {
-            v.token.starts_with("v2.local.")
-                && !v.expect_fail
-                && !v.footer.is_empty()
-        })
+        .filter(|v| v.token.starts_with("v2.local.") && !v.expect_fail && !v.footer.is_empty())
         .collect();
 
     assert!(
@@ -159,11 +180,7 @@ fn test_v2_local_footer_validation() {
         let footer = vector.footer_bytes().unwrap();
 
         // Test 1: Correct footer should succeed
-        let result = verifier.v2_local_decrypt(
-            &vector.token,
-            &key,
-            Some(&footer),
-        );
+        let result = verifier.v2_local_decrypt(&vector.token, &key, Some(&footer));
         assert!(
             result.is_ok(),
             "Test vector '{}': Decryption with correct footer failed",
@@ -172,11 +189,7 @@ fn test_v2_local_footer_validation() {
 
         // Test 2: Wrong footer should fail
         let wrong_footer = b"wrong-footer";
-        let result = verifier.v2_local_decrypt(
-            &vector.token,
-            &key,
-            Some(wrong_footer),
-        );
+        let result = verifier.v2_local_decrypt(&vector.token, &key, Some(wrong_footer));
         assert!(
             result.is_err(),
             "Test vector '{}': Decryption with wrong footer should have failed",
@@ -203,21 +216,39 @@ fn test_v2_public_verification_success() {
     );
 
     for vector in public_success_vectors {
-        let public_key = vector.public_key_bytes()
-            .unwrap_or_else(|e| panic!("Test vector '{}': Failed to decode public key: {}", vector.name, e))
+        let public_key = vector
+            .public_key_bytes()
+            .unwrap_or_else(|e| {
+                panic!(
+                    "Test vector '{}': Failed to decode public key: {}",
+                    vector.name, e
+                )
+            })
             .unwrap_or_else(|| panic!("Test vector '{}': Missing public key", vector.name));
 
-        let expected_payload = vector.payload_bytes()
-            .unwrap_or_else(|e| panic!("Test vector '{}': Failed to decode payload: {}", vector.name, e));
+        let expected_payload = vector.payload_bytes().unwrap_or_else(|e| {
+            panic!(
+                "Test vector '{}': Failed to decode payload: {}",
+                vector.name, e
+            )
+        });
 
-        let footer = vector.footer_bytes()
-            .unwrap_or_else(|e| panic!("Test vector '{}': Failed to decode footer: {}", vector.name, e));
+        let footer = vector.footer_bytes().unwrap_or_else(|e| {
+            panic!(
+                "Test vector '{}': Failed to decode footer: {}",
+                vector.name, e
+            )
+        });
 
         // Verify the token
         let result = verifier.v2_public_verify(
             &vector.token,
             &public_key,
-            if footer.is_empty() { None } else { Some(&footer) },
+            if footer.is_empty() {
+                None
+            } else {
+                Some(&footer)
+            },
         );
 
         assert!(
@@ -229,7 +260,8 @@ fn test_v2_public_verification_success() {
 
         let actual_payload = result.unwrap();
         assert_eq!(
-            actual_payload, expected_payload,
+            actual_payload,
+            expected_payload,
             "Test vector '{}': Payload mismatch.\nExpected: {:?}\nActual: {:?}",
             vector.name,
             String::from_utf8_lossy(&expected_payload),
@@ -270,7 +302,11 @@ fn test_v2_public_verification_failure() {
         let result = verifier.v2_public_verify(
             &vector.token,
             &public_key,
-            if footer.is_empty() { None } else { Some(&footer) },
+            if footer.is_empty() {
+                None
+            } else {
+                Some(&footer)
+            },
         );
 
         assert!(
@@ -290,11 +326,7 @@ fn test_v2_public_footer_validation() {
     let public_footer_vectors: Vec<&TestVector> = vectors
         .tests
         .iter()
-        .filter(|v| {
-            v.token.starts_with("v2.public.")
-                && !v.expect_fail
-                && !v.footer.is_empty()
-        })
+        .filter(|v| v.token.starts_with("v2.public.") && !v.expect_fail && !v.footer.is_empty())
         .collect();
 
     assert!(
@@ -307,11 +339,7 @@ fn test_v2_public_footer_validation() {
         let footer = vector.footer_bytes().unwrap();
 
         // Test 1: Correct footer should succeed
-        let result = verifier.v2_public_verify(
-            &vector.token,
-            &public_key,
-            Some(&footer),
-        );
+        let result = verifier.v2_public_verify(&vector.token, &public_key, Some(&footer));
         assert!(
             result.is_ok(),
             "Test vector '{}': Verification with correct footer failed",
@@ -320,11 +348,7 @@ fn test_v2_public_footer_validation() {
 
         // Test 2: Wrong footer should fail
         let wrong_footer = b"wrong-footer";
-        let result = verifier.v2_public_verify(
-            &vector.token,
-            &public_key,
-            Some(wrong_footer),
-        );
+        let result = verifier.v2_public_verify(&vector.token, &public_key, Some(wrong_footer));
         assert!(
             result.is_err(),
             "Test vector '{}': Verification with wrong footer should have failed",

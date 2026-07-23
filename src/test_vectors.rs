@@ -94,8 +94,7 @@ impl TestVectorFile {
 
     /// Load test vectors from JSON string
     pub fn load_from_str(json: &str) -> Result<Self, TestVectorError> {
-        serde_json::from_str(json)
-            .map_err(|e| TestVectorError::JsonParseError(e.to_string()))
+        serde_json::from_str(json).map_err(|e| TestVectorError::JsonParseError(e.to_string()))
     }
 }
 
@@ -106,8 +105,7 @@ impl TestVector {
             return Ok(Vec::new());
         }
 
-        hex::decode(hex)
-            .map_err(|e| TestVectorError::InvalidHex(format!("{}: {}", hex, e)))
+        hex::decode(hex).map_err(|e| TestVectorError::InvalidHex(format!("{}: {}", hex, e)))
     }
 
     /// Get the key as raw bytes (hex-decoded)
@@ -207,8 +205,7 @@ impl TestVector {
     /// Load PEM-encoded key
     fn load_pem_key(pem: &str) -> Result<Vec<u8>, TestVectorError> {
         // Parse PEM format
-        let pem_data = pem::parse(pem)
-            .map_err(|e| TestVectorError::InvalidPem(e.to_string()))?;
+        let pem_data = pem::parse(pem).map_err(|e| TestVectorError::InvalidPem(e.to_string()))?;
 
         Ok(pem_data.contents().to_vec())
     }
