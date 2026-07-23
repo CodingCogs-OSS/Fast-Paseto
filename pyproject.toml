@@ -8,9 +8,7 @@ version = "0.0.1"
 description = "High-performance PASETO tokens implemented in Rust with Python bindings"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = [
-    "hypothesis>=6.148.8",
-]
+dependencies = []
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
@@ -18,9 +16,12 @@ classifiers = [
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
+python-source = "python"
+module-name = "fast_paseto._fast_paseto"
 
 [dependency-groups]
 dev = [
+    "hypothesis>=6.148.8",
     "pyseto>=1.9.0",
     "pytest>=9.0.2",
     "python-paseto>=0.5.2",

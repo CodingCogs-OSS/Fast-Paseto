@@ -43,6 +43,11 @@ htmlcov/
 
 # Maturin
 *.whl
+# Compiled extension artifacts (produced by `maturin develop` into python/fast_paseto/)
+*.pdb
+*.pyd
+*.so
+python/fast_paseto/__pycache__/
 
 # Kiro
 .kiro/specs/

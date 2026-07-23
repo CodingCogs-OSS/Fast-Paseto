@@ -10,7 +10,7 @@
 | Maturin | >=1.10,<2.0 | Build tool (bridges Cargo + Python packaging) |
 | uv | latest | Python environment & dependency management |
 
-Crate type is `["cdylib", "rlib"]`; the module is named `fast_paseto`.
+Crate type is `["cdylib", "rlib"]` (crate/rlib name `fast_paseto`). The compiled Python extension is `fast_paseto._fast_paseto`, re-exported by the `fast_paseto` package in `python/fast_paseto/` (maturin mixed layout).
 
 ## Key Rust Dependencies
 
@@ -83,5 +83,5 @@ Property tests use `proptest` (Rust) and `hypothesis` (Python). Pytest runs on *
 |-------|-------|-----|
 | `ImportError: cannot import name` | Missing rebuild | `maturin develop` |
 | `pip install -e .` fails | Wrong build tool | Use `maturin develop` |
-| Type stub mismatch | `fast_paseto.pyi` out of sync | Update stub, run `uvx ty check` |
+| Type stub mismatch | `python/fast_paseto/_fast_paseto.pyi` out of sync | Update stub, run `uvx ty check` |
 | Crypto added in Python | Security/design violation | Move to Rust in `src/` |

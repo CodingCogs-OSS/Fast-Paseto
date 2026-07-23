@@ -15,9 +15,9 @@ use pyo3::types::PyDict;
 /// and that InvalidKeyLength errors contain expected and actual values.
 #[test]
 fn test_error_mapping_and_context() {
-    pyo3::prepare_freethreaded_python();
+    Python::initialize();
 
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         // Test InvalidKeyLength error mapping and context
         let error = PasetoError::InvalidKeyLength {
             expected: 32,
@@ -130,9 +130,9 @@ fn test_debug_implementation() {
     use fast_paseto::version::{Version, Purpose};
     use fast_paseto::key_generator::KeyGenerator;
 
-    pyo3::prepare_freethreaded_python();
+    Python::initialize();
 
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         // Test Token Debug
         let payload = PyDict::new(py).into_any().unbind();
         let token = Token::new(payload, None, "v4".to_string(), "local".to_string());

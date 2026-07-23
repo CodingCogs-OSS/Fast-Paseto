@@ -19,6 +19,40 @@ permissions:
   contents: read
 
 jobs:
+  test:
+    name: Test & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.11"
+      - name: Rust format check
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Rust unit & property tests
+        run: cargo test
+      - name: Rust test-vector suites
+        run: cargo test --features test-vectors
+      - name: Build extension module
+        run: uv run --with maturin maturin develop
+      - name: Ruff format check
+        run: uv run ruff format --check .
+      - name: Ruff lint
+        run: uv run ruff check .
+      - name: Type check (ty)
+        run: uvx ty check
+      - name: Python integration tests
+        run: uv run pytest
+
   linux:
     runs-on: ${{ matrix.platform.runner }}
     strategy:
@@ -155,7 +189,7 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
     if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
-    needs: [linux, musllinux, windows, macos, sdist]
+    needs: [test, linux, musllinux, windows, macos, sdist]
     permissions:
       # Use to sign the release artifacts
       id-token: write

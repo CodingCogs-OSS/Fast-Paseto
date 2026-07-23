@@ -48,4 +48,4 @@ Additional capabilities:
 | Use `generate_keypair()` for public tokens | Implement any crypto in Python |
 | Default to v4 unless the user specifies otherwise | Mix key types across purposes |
 | Validate key lengths (32B symmetric, 64B secret, 32B public) | Put confidential data in public tokens (signed, not encrypted) |
-| Match signatures to `fast_paseto.pyi` | Use PASETO for long-lived session storage (prefer short exp) |
+| Match signatures to `python/fast_paseto/_fast_paseto.pyi` | Use PASETO for long-lived session storage (prefer short exp) |
