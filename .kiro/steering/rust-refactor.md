@@ -1,6 +1,6 @@
 ---
-inclusion: fileMatch
-fileMatchPattern: "src/**/*.rs"
+inclusion: always
+# fileMatchPattern: "src/**/*.rs"
 ---
 
 # Rust Refactoring Guidelines

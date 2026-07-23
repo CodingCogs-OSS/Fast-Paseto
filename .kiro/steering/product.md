@@ -1,52 +1,51 @@
----
-inclusion: always
----
-
 # Product Overview
 
-fast-paseto is a high-performance PASETO (Platform-Agnostic Security Tokens) library implemented in Rust with Python bindings via PyO3.
+fast-paseto is a high-performance [PASETO](https://paseto.io/) (Platform-Agnostic Security Tokens) library: a Rust core exposed to Python via PyO3. It aims to be significantly faster than pure-Python alternatives (benchmarked against `pyseto`) while keeping a clean, type-hinted Python API.
 
-## Core Purpose
+## Token Types
 
-Provide a secure, fast, and easy-to-use API for creating and verifying PASETO tokens in Python applications, leveraging Rust's performance and memory safety guarantees.
+| Type | Crypto (v4) | Use Case |
+|------|-------------|----------|
+| `local` (symmetric) | XChaCha20-Poly1305 | Encrypted, confidential data |
+| `public` (asymmetric) | Ed25519 signatures | Signed, verifiable data (NOT encrypted) |
 
-## Key Capabilities
+## Supported Versions
 
-### Token Operations
-- **Local tokens** (symmetric): XChaCha20-Poly1305 encryption for confidential data
-- **Public tokens** (asymmetric): Ed25519 signatures for verifiable, non-confidential data
-- Support for v4 (primary), v3 (NIST-compliant), and v2 (legacy) protocols
+| Version | Local (encryption) | Public (signatures) |
+|---------|--------------------|----------------------|
+| v4 (default) | XChaCha20-Poly1305 | Ed25519 |
+| v3 (NIST) | AES-256-CTR + HMAC-SHA384 | ECDSA P-384 |
+| v2 (legacy) | XChaCha20-Poly1305 | Ed25519 |
 
-### API Design Principles
-- **Two usage patterns**: Module-level functions (`encode()`, `decode()`) for simple use cases; `Paseto` class for configurable defaults
-- **Automatic claim management**: Optional auto-injection of `exp` (expiration) and `iat` (issued-at) claims
-- **Flexible serialization**: JSON by default, custom serializers supported via Protocol
-- **Type safety**: Full type stubs provided in `fast_paseto.pyi`
+## API Surface
 
-### Security Features
-- Cryptographic operations handled entirely in Rust
-- Time-based claim validation with configurable leeway
-- Footer and implicit assertion support per PASETO spec
-- Proper key length validation (32 bytes symmetric, 64 bytes secret, 32 bytes public)
+Two usage styles:
 
-## Design Constraints
+1. **Module functions** — `encode()`, `decode()`, `generate_symmetric_key()`, `generate_keypair()` for one-off operations.
+2. **`Paseto` class** — Configurable instance with defaults: `default_exp`, `include_iat`, `leeway`.
 
-- **No runtime Python dependencies**: Pure Rust extension module
-- **Python 3.11+ only**: Leverages modern Python features
-- **v4 tokens are default**: Older versions require explicit version parameter
-- **Immutable Token objects**: Decoded tokens are read-only data containers
+Additional capabilities:
+- **PASERK** — key serialization (`to_paserk_local/secret/public`, `from_paserk`), key IDs (`generate_lid/sid/pid`), key wrapping (`local_wrap/unwrap`, `secret_wrap/unwrap`), password protection with Argon2id (`local_pw_encrypt/decrypt`, `secret_pw_encrypt/decrypt`).
+- **PEM loading** — `ed25519_from_pem`, `ed25519_public_from_pem`.
+- **Footers & implicit assertions** — supported on encode/decode.
+- **Custom serialization** — JSON by default; pass an object implementing the `Serializer`/`Deserializer` protocol.
+- Auto-injects `exp`/`iat` claims when configured on a `Paseto` instance.
+- `decode()` returns an immutable `Token` (supports attribute access, `[]`, `in`, `to_dict()`).
 
-## Target Users
+## Key Lengths
 
-Python developers building authentication systems who need:
-- Better security defaults than JWT
-- High performance token operations
-- Type-safe token handling
-- Protection against common JWT vulnerabilities (algorithm confusion, weak signatures)
+| Key Type | Length | Token Type |
+|----------|--------|------------|
+| Symmetric | 32 bytes | local |
+| Ed25519 secret | 64 bytes | public (signing) |
+| Ed25519 public | 32 bytes | public (verification) |
 
-## Anti-Patterns to Avoid
+## Code Generation Rules
 
-- Don't use PASETO for session storage (use local tokens with short expiration instead)
-- Don't put sensitive data in public tokens (they're signed, not encrypted)
-- Don't reuse keys across different purposes (local vs public)
-- Don't implement custom crypto - use provided key generation functions
+| Do | Don't |
+|----|-------|
+| Use `generate_symmetric_key()` for local tokens | Hardcode or hand-roll keys |
+| Use `generate_keypair()` for public tokens | Implement any crypto in Python |
+| Default to v4 unless the user specifies otherwise | Mix key types across purposes |
+| Validate key lengths (32B symmetric, 64B secret, 32B public) | Put confidential data in public tokens (signed, not encrypted) |
+| Match signatures to `fast_paseto.pyi` | Use PASETO for long-lived session storage (prefer short exp) |

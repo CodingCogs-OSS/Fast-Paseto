@@ -1,3 +1,49 @@
+//! PASERK key management for serialization, wrapping, and identification
+//!
+//! This module implements the PASERK (Platform-Agnostic Serialized Keys) specification
+//! for key serialization, key wrapping, password-based encryption, and key identification.
+//!
+//! # Overview
+//!
+//! PASERK provides standardized formats for:
+//! - **Key Serialization**: Converting keys to/from portable string formats
+//! - **Key Wrapping**: Encrypting keys with other keys for secure storage
+//! - **Password Protection**: Encrypting keys with passwords using Argon2id
+//! - **Key Identification**: Generating deterministic IDs for keys
+//! - **PEM Import**: Loading keys from standard PEM formats
+//!
+//! # PASERK Formats
+//!
+//! | Format | Description | Example |
+//! |--------|-------------|---------|
+//! | `k4.local.{key}` | Symmetric key | `k4.local.AAAA...` |
+//! | `k4.secret.{key}` | Ed25519 secret key | `k4.secret.AAAA...` |
+//! | `k4.public.{key}` | Ed25519 public key | `k4.public.AAAA...` |
+//! | `k4.local-wrap.pie.{data}` | Wrapped symmetric key | `k4.local-wrap.pie.AAAA...` |
+//! | `k4.secret-wrap.pie.{data}` | Wrapped secret key | `k4.secret-wrap.pie.AAAA...` |
+//! | `k4.local-pw.{data}` | Password-encrypted symmetric key | `k4.local-pw.AAAA...` |
+//! | `k4.secret-pw.{data}` | Password-encrypted secret key | `k4.secret-pw.AAAA...` |
+//! | `k4.lid.{hash}` | Local key ID | `k4.lid.AAAA...` |
+//! | `k4.sid.{hash}` | Secret key ID | `k4.sid.AAAA...` |
+//! | `k4.pid.{hash}` | Public key ID | `k4.pid.AAAA...` |
+//!
+//! # Example
+//!
+//! ```rust
+//! use fast_paseto::{KeyManager, KeyGenerator, PaserkId};
+//!
+//! // Generate and serialize a symmetric key
+//! let key = KeyGenerator::generate_symmetric_key();
+//! let paserk = KeyManager::to_paserk_local(&key);
+//!
+//! // Generate a key ID for identification
+//! let key_id = PaserkId::generate_lid(&key);
+//!
+//! // Wrap a key with another key for secure storage
+//! let wrapping_key = KeyGenerator::generate_symmetric_key();
+//! let wrapped = KeyManager::local_wrap(&key, &wrapping_key).unwrap();
+//! ```
+
 use crate::error::PasetoError;
 use crate::token_generator::TokenGenerator;
 use crate::token_verifier::TokenVerifier;
@@ -5,6 +51,8 @@ use base64::prelude::*;
 use blake2::{Blake2b512, Digest};
 
 /// PASERK key types for deserialization
+///
+/// Represents the different key types that can be parsed from PASERK format strings.
 #[derive(Debug, Clone, PartialEq)]
 pub enum PaserkKey {
     /// Local (symmetric) key - 32 bytes
@@ -16,6 +64,7 @@ pub enum PaserkKey {
 }
 
 /// PASERK key management for serialization and deserialization
+#[derive(Debug)]
 pub struct KeyManager;
 
 impl KeyManager {
@@ -1018,6 +1067,7 @@ impl KeyManager {
 ///
 /// PASERK (Platform-Agnostic Serialized Keys) IDs provide a deterministic
 /// way to identify keys without exposing the key material itself.
+#[derive(Debug)]
 pub struct PaserkId;
 
 impl PaserkId {

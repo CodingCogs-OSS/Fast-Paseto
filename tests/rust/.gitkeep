@@ -1,0 +1,5 @@
+# Placeholder for Rust integration tests
+#
+# This directory is reserved for Rust integration tests.
+# Currently, all Rust tests are unit tests located in src/ files within #[cfg(test)] modules.
+# If integration tests are needed in the future, they should be placed here.
