@@ -15,9 +15,9 @@ use pyo3::types::PyDict;
 /// and that InvalidKeyLength errors contain expected and actual values.
 #[test]
 fn test_error_mapping_and_context() {
-    pyo3::prepare_freethreaded_python();
+    Python::initialize();
 
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         // Test InvalidKeyLength error mapping and context
         let error = PasetoError::InvalidKeyLength {
             expected: 32,
@@ -27,8 +27,14 @@ fn test_error_mapping_and_context() {
         let err_str = format!("{}", py_err);
 
         // Verify error message contains both expected and actual values
-        assert!(err_str.contains("32"), "Error should contain expected value 32");
-        assert!(err_str.contains("16"), "Error should contain actual value 16");
+        assert!(
+            err_str.contains("32"),
+            "Error should contain expected value 32"
+        );
+        assert!(
+            err_str.contains("16"),
+            "Error should contain actual value 16"
+        );
 
         // Verify it maps to PasetoKeyError
         assert!(py_err.is_instance_of::<pyo3::exceptions::PyException>(py));
@@ -127,50 +133,77 @@ fn test_error_mapping_and_context() {
 #[test]
 fn test_debug_implementation() {
     use fast_paseto::Token;
-    use fast_paseto::version::{Version, Purpose};
     use fast_paseto::key_generator::KeyGenerator;
+    use fast_paseto::version::{Purpose, Version};
 
-    pyo3::prepare_freethreaded_python();
+    Python::initialize();
 
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         // Test Token Debug
         let payload = PyDict::new(py).into_any().unbind();
         let token = Token::new(payload, None, "v4".to_string(), "local".to_string());
         let debug_str = format!("{:?}", token);
-        assert!(!debug_str.is_empty(), "Token Debug should produce non-empty string");
+        assert!(
+            !debug_str.is_empty(),
+            "Token Debug should produce non-empty string"
+        );
 
         // Test PasetoError Debug (all variants)
-        let error = PasetoError::InvalidKeyLength { expected: 32, actual: 16 };
+        let error = PasetoError::InvalidKeyLength {
+            expected: 32,
+            actual: 16,
+        };
         let debug_str = format!("{:?}", error);
-        assert!(!debug_str.is_empty(), "PasetoError Debug should produce non-empty string");
+        assert!(
+            !debug_str.is_empty(),
+            "PasetoError Debug should produce non-empty string"
+        );
 
         let error = PasetoError::InvalidKeyFormat("test".to_string());
         let debug_str = format!("{:?}", error);
-        assert!(!debug_str.is_empty(), "PasetoError Debug should produce non-empty string");
+        assert!(
+            !debug_str.is_empty(),
+            "PasetoError Debug should produce non-empty string"
+        );
 
         let error = PasetoError::TokenExpired;
         let debug_str = format!("{:?}", error);
-        assert!(!debug_str.is_empty(), "PasetoError Debug should produce non-empty string");
+        assert!(
+            !debug_str.is_empty(),
+            "PasetoError Debug should produce non-empty string"
+        );
 
         // Test Version Debug
         let version = Version::V4;
         let debug_str = format!("{:?}", version);
-        assert!(!debug_str.is_empty(), "Version Debug should produce non-empty string");
+        assert!(
+            !debug_str.is_empty(),
+            "Version Debug should produce non-empty string"
+        );
 
         // Test Purpose Debug
         let purpose = Purpose::Local;
         let debug_str = format!("{:?}", purpose);
-        assert!(!debug_str.is_empty(), "Purpose Debug should produce non-empty string");
+        assert!(
+            !debug_str.is_empty(),
+            "Purpose Debug should produce non-empty string"
+        );
 
         // Test Ed25519KeyPair Debug
         let keypair = KeyGenerator::generate_ed25519_keypair();
         let debug_str = format!("{:?}", keypair);
-        assert!(!debug_str.is_empty(), "Ed25519KeyPair Debug should produce non-empty string");
+        assert!(
+            !debug_str.is_empty(),
+            "Ed25519KeyPair Debug should produce non-empty string"
+        );
 
         // Test P384KeyPair Debug
         let keypair = KeyGenerator::generate_p384_keypair();
         let debug_str = format!("{:?}", keypair);
-        assert!(!debug_str.is_empty(), "P384KeyPair Debug should produce non-empty string");
+        assert!(
+            !debug_str.is_empty(),
+            "P384KeyPair Debug should produce non-empty string"
+        );
     });
 }
 

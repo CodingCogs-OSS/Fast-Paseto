@@ -1,0 +1,28 @@
+# Normalize line endings: treat everything as text and let Git handle EOL,
+# but pin source and config files to LF so formatting stays stable across OSes.
+* text=auto eol=lf
+
+# Source
+*.rs   text eol=lf
+*.py   text eol=lf
+*.pyi  text eol=lf
+
+# Config / data / docs
+*.toml text eol=lf
+*.json text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.md   text eol=lf
+*.lock text eol=lf
+*.cfg  text eol=lf
+*.ini  text eol=lf
+*.sh   text eol=lf
+.gitattributes text eol=lf
+.gitignore     text eol=lf
+
+# Compiled extension artifacts (belt-and-suspenders; also gitignored)
+*.pdb binary
+*.pyd binary
+*.so  binary
+*.whl binary
+*.gz  binary

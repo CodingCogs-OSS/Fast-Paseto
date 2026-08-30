@@ -440,8 +440,7 @@ impl TokenGenerator {
         let footer_bytes = footer.unwrap_or(b"");
         let implicit_bytes = implicit_assertion.unwrap_or(b"");
 
-        let pae_pieces: Vec<&[u8]> =
-            vec![header, nonce, &ciphertext, footer_bytes, implicit_bytes];
+        let pae_pieces: Vec<&[u8]> = vec![header, nonce, &ciphertext, footer_bytes, implicit_bytes];
         let pae = Pae::encode(&pae_pieces);
 
         // Compute authentication tag using BLAKE2b-MAC
@@ -636,8 +635,7 @@ impl TokenGenerator {
         let header = b"v3.local.";
         let footer_bytes = footer.unwrap_or(b"");
         let implicit_bytes = implicit_assertion.unwrap_or(b"");
-        let pae_pieces: Vec<&[u8]> =
-            vec![header, nonce, &ciphertext, footer_bytes, implicit_bytes];
+        let pae_pieces: Vec<&[u8]> = vec![header, nonce, &ciphertext, footer_bytes, implicit_bytes];
         let pae = Pae::encode(&pae_pieces);
 
         // Compute HMAC-SHA384 tag
@@ -1791,15 +1789,19 @@ mod tests {
         let nonce = [1u8; 32];
 
         // Generate two tokens with the same nonce
-        let token1 = TokenGenerator::v4_local_encrypt_with_nonce(&key, payload, None, None, &nonce).unwrap();
-        let token2 = TokenGenerator::v4_local_encrypt_with_nonce(&key, payload, None, None, &nonce).unwrap();
+        let token1 =
+            TokenGenerator::v4_local_encrypt_with_nonce(&key, payload, None, None, &nonce).unwrap();
+        let token2 =
+            TokenGenerator::v4_local_encrypt_with_nonce(&key, payload, None, None, &nonce).unwrap();
 
         // Tokens should be identical when using the same nonce
         assert_eq!(token1, token2, "Tokens with same nonce should be identical");
 
         // Verify the token can be decrypted
         let verifier = TokenVerifier::new(None);
-        let decrypted = verifier.v4_local_decrypt(&token1, &key, None, None).unwrap();
+        let decrypted = verifier
+            .v4_local_decrypt(&token1, &key, None, None)
+            .unwrap();
         assert_eq!(decrypted, payload);
     }
 
@@ -1810,15 +1812,19 @@ mod tests {
         let nonce = [1u8; 32];
 
         // Generate two tokens with the same nonce
-        let token1 = TokenGenerator::v3_local_encrypt_with_nonce(&key, payload, None, None, &nonce).unwrap();
-        let token2 = TokenGenerator::v3_local_encrypt_with_nonce(&key, payload, None, None, &nonce).unwrap();
+        let token1 =
+            TokenGenerator::v3_local_encrypt_with_nonce(&key, payload, None, None, &nonce).unwrap();
+        let token2 =
+            TokenGenerator::v3_local_encrypt_with_nonce(&key, payload, None, None, &nonce).unwrap();
 
         // Tokens should be identical when using the same nonce
         assert_eq!(token1, token2, "Tokens with same nonce should be identical");
 
         // Verify the token can be decrypted
         let verifier = TokenVerifier::new(None);
-        let decrypted = verifier.v3_local_decrypt(&token1, &key, None, None).unwrap();
+        let decrypted = verifier
+            .v3_local_decrypt(&token1, &key, None, None)
+            .unwrap();
         assert_eq!(decrypted, payload);
     }
 
@@ -1829,8 +1835,10 @@ mod tests {
         let nonce = [1u8; 24];
 
         // Generate two tokens with the same nonce
-        let token1 = TokenGenerator::v2_local_encrypt_with_nonce(&key, payload, None, &nonce).unwrap();
-        let token2 = TokenGenerator::v2_local_encrypt_with_nonce(&key, payload, None, &nonce).unwrap();
+        let token1 =
+            TokenGenerator::v2_local_encrypt_with_nonce(&key, payload, None, &nonce).unwrap();
+        let token2 =
+            TokenGenerator::v2_local_encrypt_with_nonce(&key, payload, None, &nonce).unwrap();
 
         // Tokens should be identical when using the same nonce
         assert_eq!(token1, token2, "Tokens with same nonce should be identical");
@@ -1850,14 +1858,30 @@ mod tests {
         let nonce = [2u8; 32];
 
         // Test v4.local with footer and implicit assertion
-        let token1 = TokenGenerator::v4_local_encrypt_with_nonce(&key, payload, Some(footer), Some(implicit), &nonce).unwrap();
-        let token2 = TokenGenerator::v4_local_encrypt_with_nonce(&key, payload, Some(footer), Some(implicit), &nonce).unwrap();
+        let token1 = TokenGenerator::v4_local_encrypt_with_nonce(
+            &key,
+            payload,
+            Some(footer),
+            Some(implicit),
+            &nonce,
+        )
+        .unwrap();
+        let token2 = TokenGenerator::v4_local_encrypt_with_nonce(
+            &key,
+            payload,
+            Some(footer),
+            Some(implicit),
+            &nonce,
+        )
+        .unwrap();
 
         assert_eq!(token1, token2, "Tokens with same nonce should be identical");
 
         // Verify decryption
         let verifier = TokenVerifier::new(None);
-        let decrypted = verifier.v4_local_decrypt(&token1, &key, Some(footer), Some(implicit)).unwrap();
+        let decrypted = verifier
+            .v4_local_decrypt(&token1, &key, Some(footer), Some(implicit))
+            .unwrap();
         assert_eq!(decrypted, payload);
     }
 

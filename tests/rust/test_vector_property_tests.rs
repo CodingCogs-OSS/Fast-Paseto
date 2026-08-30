@@ -56,7 +56,10 @@ fn prop_v2_local_decryption_success() {
         let expected_payload = match vector.payload_bytes() {
             Ok(p) => p,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode payload: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode payload: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -65,7 +68,10 @@ fn prop_v2_local_decryption_success() {
         let footer = match vector.footer_bytes() {
             Ok(f) => f,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode footer: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode footer: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -74,7 +80,11 @@ fn prop_v2_local_decryption_success() {
         let result = verifier.v2_local_decrypt(
             &vector.token,
             &key,
-            if footer.is_empty() { None } else { Some(&footer) },
+            if footer.is_empty() {
+                None
+            } else {
+                Some(&footer)
+            },
         );
 
         match result {
@@ -104,7 +114,8 @@ fn prop_v2_local_decryption_success() {
         success_vectors.len()
     );
     assert_eq!(
-        failed, 0,
+        failed,
+        0,
         "v2.local: {} test vectors failed out of {}",
         failed,
         success_vectors.len()
@@ -142,7 +153,10 @@ fn prop_v2_public_verification_success() {
                 continue;
             }
             Err(e) => {
-                println!("Test vector '{}': Failed to decode public key: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode public key: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -151,7 +165,10 @@ fn prop_v2_public_verification_success() {
         let expected_payload = match vector.payload_bytes() {
             Ok(p) => p,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode payload: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode payload: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -160,7 +177,10 @@ fn prop_v2_public_verification_success() {
         let footer = match vector.footer_bytes() {
             Ok(f) => f,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode footer: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode footer: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -169,7 +189,11 @@ fn prop_v2_public_verification_success() {
         let result = verifier.v2_public_verify(
             &vector.token,
             &public_key,
-            if footer.is_empty() { None } else { Some(&footer) },
+            if footer.is_empty() {
+                None
+            } else {
+                Some(&footer)
+            },
         );
 
         match result {
@@ -187,7 +211,10 @@ fn prop_v2_public_verification_success() {
                 }
             }
             Err(e) => {
-                println!("Test vector '{}': Verification failed: {:?}", vector.name, e);
+                println!(
+                    "Test vector '{}': Verification failed: {:?}",
+                    vector.name, e
+                );
                 failed += 1;
             }
         }
@@ -199,7 +226,8 @@ fn prop_v2_public_verification_success() {
         success_vectors.len()
     );
     assert_eq!(
-        failed, 0,
+        failed,
+        0,
         "v2.public: {} test vectors failed out of {}",
         failed,
         success_vectors.len()
@@ -246,7 +274,10 @@ fn prop_v3_local_decryption_success() {
         let expected_payload = match vector.payload_bytes() {
             Ok(p) => p,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode payload: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode payload: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -255,7 +286,10 @@ fn prop_v3_local_decryption_success() {
         let footer = match vector.footer_bytes() {
             Ok(f) => f,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode footer: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode footer: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -264,7 +298,10 @@ fn prop_v3_local_decryption_success() {
         let implicit_assertion = match vector.implicit_assertion_bytes() {
             Ok(ia) => ia,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode implicit assertion: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode implicit assertion: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -273,8 +310,16 @@ fn prop_v3_local_decryption_success() {
         let result = verifier.v3_local_decrypt(
             &vector.token,
             &key,
-            if footer.is_empty() { None } else { Some(&footer) },
-            if implicit_assertion.is_empty() { None } else { Some(&implicit_assertion) },
+            if footer.is_empty() {
+                None
+            } else {
+                Some(&footer)
+            },
+            if implicit_assertion.is_empty() {
+                None
+            } else {
+                Some(&implicit_assertion)
+            },
         );
 
         match result {
@@ -304,7 +349,8 @@ fn prop_v3_local_decryption_success() {
         success_vectors.len()
     );
     assert_eq!(
-        failed, 0,
+        failed,
+        0,
         "v3.local: {} test vectors failed out of {}",
         failed,
         success_vectors.len()
@@ -347,7 +393,10 @@ fn prop_v3_public_verification_success() {
                 continue;
             }
             Err(e) => {
-                println!("Test vector '{}': Failed to decode public key: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode public key: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -356,7 +405,10 @@ fn prop_v3_public_verification_success() {
         let expected_payload = match vector.payload_bytes() {
             Ok(p) => p,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode payload: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode payload: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -365,7 +417,10 @@ fn prop_v3_public_verification_success() {
         let footer = match vector.footer_bytes() {
             Ok(f) => f,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode footer: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode footer: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -374,7 +429,10 @@ fn prop_v3_public_verification_success() {
         let implicit_assertion = match vector.implicit_assertion_bytes() {
             Ok(ia) => ia,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode implicit assertion: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode implicit assertion: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -383,8 +441,16 @@ fn prop_v3_public_verification_success() {
         let result = verifier.v3_public_verify(
             &vector.token,
             &public_key,
-            if footer.is_empty() { None } else { Some(&footer) },
-            if implicit_assertion.is_empty() { None } else { Some(&implicit_assertion) },
+            if footer.is_empty() {
+                None
+            } else {
+                Some(&footer)
+            },
+            if implicit_assertion.is_empty() {
+                None
+            } else {
+                Some(&implicit_assertion)
+            },
         );
 
         match result {
@@ -402,7 +468,10 @@ fn prop_v3_public_verification_success() {
                 }
             }
             Err(e) => {
-                println!("Test vector '{}': Verification failed: {:?}", vector.name, e);
+                println!(
+                    "Test vector '{}': Verification failed: {:?}",
+                    vector.name, e
+                );
                 failed += 1;
             }
         }
@@ -414,7 +483,8 @@ fn prop_v3_public_verification_success() {
         success_vectors.len()
     );
     assert_eq!(
-        failed, 0,
+        failed,
+        0,
         "v3.public: {} test vectors failed out of {}",
         failed,
         success_vectors.len()
@@ -463,7 +533,10 @@ fn prop_v4_local_decryption_success() {
         let expected_payload = match vector.payload_bytes() {
             Ok(p) => p,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode payload: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode payload: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -472,7 +545,10 @@ fn prop_v4_local_decryption_success() {
         let footer = match vector.footer_bytes() {
             Ok(f) => f,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode footer: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode footer: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -481,7 +557,10 @@ fn prop_v4_local_decryption_success() {
         let implicit_assertion = match vector.implicit_assertion_bytes() {
             Ok(ia) => ia,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode implicit assertion: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode implicit assertion: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -490,8 +569,16 @@ fn prop_v4_local_decryption_success() {
         let result = verifier.v4_local_decrypt(
             &vector.token,
             &key,
-            if footer.is_empty() { None } else { Some(&footer) },
-            if implicit_assertion.is_empty() { None } else { Some(&implicit_assertion) },
+            if footer.is_empty() {
+                None
+            } else {
+                Some(&footer)
+            },
+            if implicit_assertion.is_empty() {
+                None
+            } else {
+                Some(&implicit_assertion)
+            },
         );
 
         match result {
@@ -521,7 +608,8 @@ fn prop_v4_local_decryption_success() {
         success_vectors.len()
     );
     assert_eq!(
-        failed, 0,
+        failed,
+        0,
         "v4.local: {} test vectors failed out of {}",
         failed,
         success_vectors.len()
@@ -559,7 +647,10 @@ fn prop_v4_public_verification_success() {
                 continue;
             }
             Err(e) => {
-                println!("Test vector '{}': Failed to decode public key: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode public key: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -568,7 +659,10 @@ fn prop_v4_public_verification_success() {
         let expected_payload = match vector.payload_bytes() {
             Ok(p) => p,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode payload: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode payload: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -577,7 +671,10 @@ fn prop_v4_public_verification_success() {
         let footer = match vector.footer_bytes() {
             Ok(f) => f,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode footer: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode footer: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -586,7 +683,10 @@ fn prop_v4_public_verification_success() {
         let implicit_assertion = match vector.implicit_assertion_bytes() {
             Ok(ia) => ia,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode implicit assertion: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode implicit assertion: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -595,8 +695,16 @@ fn prop_v4_public_verification_success() {
         let result = verifier.v4_public_verify(
             &vector.token,
             &public_key,
-            if footer.is_empty() { None } else { Some(&footer) },
-            if implicit_assertion.is_empty() { None } else { Some(&implicit_assertion) },
+            if footer.is_empty() {
+                None
+            } else {
+                Some(&footer)
+            },
+            if implicit_assertion.is_empty() {
+                None
+            } else {
+                Some(&implicit_assertion)
+            },
         );
 
         match result {
@@ -614,7 +722,10 @@ fn prop_v4_public_verification_success() {
                 }
             }
             Err(e) => {
-                println!("Test vector '{}': Verification failed: {:?}", vector.name, e);
+                println!(
+                    "Test vector '{}': Verification failed: {:?}",
+                    vector.name, e
+                );
                 failed += 1;
             }
         }
@@ -626,7 +737,8 @@ fn prop_v4_public_verification_success() {
         success_vectors.len()
     );
     assert_eq!(
-        failed, 0,
+        failed,
+        0,
         "v4.public: {} test vectors failed out of {}",
         failed,
         success_vectors.len()
@@ -675,7 +787,10 @@ fn prop_v2_local_decryption_failure() {
         let footer = match vector.footer_bytes() {
             Ok(f) => f,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode footer: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode footer: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -684,7 +799,11 @@ fn prop_v2_local_decryption_failure() {
         let result = verifier.v2_local_decrypt(
             &vector.token,
             &key,
-            if footer.is_empty() { None } else { Some(&footer) },
+            if footer.is_empty() {
+                None
+            } else {
+                Some(&footer)
+            },
         );
 
         match result {
@@ -708,7 +827,8 @@ fn prop_v2_local_decryption_failure() {
         failure_vectors.len()
     );
     assert_eq!(
-        failed, 0,
+        failed,
+        0,
         "v2.local: {} test vectors failed out of {}",
         failed,
         failure_vectors.len()
@@ -735,8 +855,8 @@ fn prop_v2_public_verification_failure() {
         .iter()
         .filter(|v| {
             v.token.starts_with("v2.public.")
-            && v.expect_fail
-            && v.public_key_bytes().ok().flatten().is_some()
+                && v.expect_fail
+                && v.public_key_bytes().ok().flatten().is_some()
         })
         .collect();
 
@@ -752,12 +872,18 @@ fn prop_v2_public_verification_failure() {
         let public_key = match vector.public_key_bytes() {
             Ok(Some(k)) => k,
             Ok(None) => {
-                println!("Test vector '{}': Missing public key (should not happen)", vector.name);
+                println!(
+                    "Test vector '{}': Missing public key (should not happen)",
+                    vector.name
+                );
                 failed += 1;
                 continue;
             }
             Err(e) => {
-                println!("Test vector '{}': Failed to decode public key: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode public key: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -766,7 +892,10 @@ fn prop_v2_public_verification_failure() {
         let footer = match vector.footer_bytes() {
             Ok(f) => f,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode footer: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode footer: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -775,7 +904,11 @@ fn prop_v2_public_verification_failure() {
         let result = verifier.v2_public_verify(
             &vector.token,
             &public_key,
-            if footer.is_empty() { None } else { Some(&footer) },
+            if footer.is_empty() {
+                None
+            } else {
+                Some(&footer)
+            },
         );
 
         match result {
@@ -799,7 +932,8 @@ fn prop_v2_public_verification_failure() {
         failure_vectors.len()
     );
     assert_eq!(
-        failed, 0,
+        failed,
+        0,
         "v2.public: {} test vectors failed out of {}",
         failed,
         failure_vectors.len()
@@ -844,7 +978,10 @@ fn prop_v3_local_decryption_failure() {
         let footer = match vector.footer_bytes() {
             Ok(f) => f,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode footer: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode footer: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -853,7 +990,10 @@ fn prop_v3_local_decryption_failure() {
         let implicit_assertion = match vector.implicit_assertion_bytes() {
             Ok(ia) => ia,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode implicit assertion: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode implicit assertion: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -862,8 +1002,16 @@ fn prop_v3_local_decryption_failure() {
         let result = verifier.v3_local_decrypt(
             &vector.token,
             &key,
-            if footer.is_empty() { None } else { Some(&footer) },
-            if implicit_assertion.is_empty() { None } else { Some(&implicit_assertion) },
+            if footer.is_empty() {
+                None
+            } else {
+                Some(&footer)
+            },
+            if implicit_assertion.is_empty() {
+                None
+            } else {
+                Some(&implicit_assertion)
+            },
         );
 
         match result {
@@ -887,7 +1035,8 @@ fn prop_v3_local_decryption_failure() {
         failure_vectors.len()
     );
     assert_eq!(
-        failed, 0,
+        failed,
+        0,
         "v3.local: {} test vectors failed out of {}",
         failed,
         failure_vectors.len()
@@ -914,8 +1063,8 @@ fn prop_v3_public_verification_failure() {
         .iter()
         .filter(|v| {
             v.token.starts_with("v3.public.")
-            && v.expect_fail
-            && v.public_key_bytes().ok().flatten().is_some()
+                && v.expect_fail
+                && v.public_key_bytes().ok().flatten().is_some()
         })
         .collect();
 
@@ -931,12 +1080,18 @@ fn prop_v3_public_verification_failure() {
         let public_key = match vector.public_key_bytes() {
             Ok(Some(k)) => k,
             Ok(None) => {
-                println!("Test vector '{}': Missing public key (should not happen)", vector.name);
+                println!(
+                    "Test vector '{}': Missing public key (should not happen)",
+                    vector.name
+                );
                 failed += 1;
                 continue;
             }
             Err(e) => {
-                println!("Test vector '{}': Failed to decode public key: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode public key: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -945,7 +1100,10 @@ fn prop_v3_public_verification_failure() {
         let footer = match vector.footer_bytes() {
             Ok(f) => f,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode footer: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode footer: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -954,7 +1112,10 @@ fn prop_v3_public_verification_failure() {
         let implicit_assertion = match vector.implicit_assertion_bytes() {
             Ok(ia) => ia,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode implicit assertion: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode implicit assertion: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -963,8 +1124,16 @@ fn prop_v3_public_verification_failure() {
         let result = verifier.v3_public_verify(
             &vector.token,
             &public_key,
-            if footer.is_empty() { None } else { Some(&footer) },
-            if implicit_assertion.is_empty() { None } else { Some(&implicit_assertion) },
+            if footer.is_empty() {
+                None
+            } else {
+                Some(&footer)
+            },
+            if implicit_assertion.is_empty() {
+                None
+            } else {
+                Some(&implicit_assertion)
+            },
         );
 
         match result {
@@ -988,7 +1157,8 @@ fn prop_v3_public_verification_failure() {
         failure_vectors.len()
     );
     assert_eq!(
-        failed, 0,
+        failed,
+        0,
         "v3.public: {} test vectors failed out of {}",
         failed,
         failure_vectors.len()
@@ -1033,7 +1203,10 @@ fn prop_v4_local_decryption_failure() {
         let footer = match vector.footer_bytes() {
             Ok(f) => f,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode footer: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode footer: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -1042,7 +1215,10 @@ fn prop_v4_local_decryption_failure() {
         let implicit_assertion = match vector.implicit_assertion_bytes() {
             Ok(ia) => ia,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode implicit assertion: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode implicit assertion: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -1051,8 +1227,16 @@ fn prop_v4_local_decryption_failure() {
         let result = verifier.v4_local_decrypt(
             &vector.token,
             &key,
-            if footer.is_empty() { None } else { Some(&footer) },
-            if implicit_assertion.is_empty() { None } else { Some(&implicit_assertion) },
+            if footer.is_empty() {
+                None
+            } else {
+                Some(&footer)
+            },
+            if implicit_assertion.is_empty() {
+                None
+            } else {
+                Some(&implicit_assertion)
+            },
         );
 
         match result {
@@ -1076,7 +1260,8 @@ fn prop_v4_local_decryption_failure() {
         failure_vectors.len()
     );
     assert_eq!(
-        failed, 0,
+        failed,
+        0,
         "v4.local: {} test vectors failed out of {}",
         failed,
         failure_vectors.len()
@@ -1103,8 +1288,8 @@ fn prop_v4_public_verification_failure() {
         .iter()
         .filter(|v| {
             v.token.starts_with("v4.public.")
-            && v.expect_fail
-            && v.public_key_bytes().ok().flatten().is_some()
+                && v.expect_fail
+                && v.public_key_bytes().ok().flatten().is_some()
         })
         .collect();
 
@@ -1120,12 +1305,18 @@ fn prop_v4_public_verification_failure() {
         let public_key = match vector.public_key_bytes() {
             Ok(Some(k)) => k,
             Ok(None) => {
-                println!("Test vector '{}': Missing public key (should not happen)", vector.name);
+                println!(
+                    "Test vector '{}': Missing public key (should not happen)",
+                    vector.name
+                );
                 failed += 1;
                 continue;
             }
             Err(e) => {
-                println!("Test vector '{}': Failed to decode public key: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode public key: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -1134,7 +1325,10 @@ fn prop_v4_public_verification_failure() {
         let footer = match vector.footer_bytes() {
             Ok(f) => f,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode footer: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode footer: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -1143,7 +1337,10 @@ fn prop_v4_public_verification_failure() {
         let implicit_assertion = match vector.implicit_assertion_bytes() {
             Ok(ia) => ia,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode implicit assertion: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode implicit assertion: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -1152,8 +1349,16 @@ fn prop_v4_public_verification_failure() {
         let result = verifier.v4_public_verify(
             &vector.token,
             &public_key,
-            if footer.is_empty() { None } else { Some(&footer) },
-            if implicit_assertion.is_empty() { None } else { Some(&implicit_assertion) },
+            if footer.is_empty() {
+                None
+            } else {
+                Some(&footer)
+            },
+            if implicit_assertion.is_empty() {
+                None
+            } else {
+                Some(&implicit_assertion)
+            },
         );
 
         match result {
@@ -1177,7 +1382,8 @@ fn prop_v4_public_verification_failure() {
         failure_vectors.len()
     );
     assert_eq!(
-        failed, 0,
+        failed,
+        0,
         "v4.public: {} test vectors failed out of {}",
         failed,
         failure_vectors.len()
@@ -1202,11 +1408,7 @@ fn prop_v2_local_footer_validation() {
     let footer_vectors: Vec<_> = vectors
         .tests
         .iter()
-        .filter(|v| {
-            v.token.starts_with("v2.local.")
-            && !v.expect_fail
-            && !v.footer.is_empty()
-        })
+        .filter(|v| v.token.starts_with("v2.local.") && !v.expect_fail && !v.footer.is_empty())
         .collect();
 
     if footer_vectors.is_empty() {
@@ -1231,22 +1433,22 @@ fn prop_v2_local_footer_validation() {
         let footer = match vector.footer_bytes() {
             Ok(f) => f,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode footer: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode footer: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
         };
 
-        let result_correct = verifier.v2_local_decrypt(
-            &vector.token,
-            &key,
-            Some(&footer),
-        );
+        let result_correct = verifier.v2_local_decrypt(&vector.token, &key, Some(&footer));
 
         if result_correct.is_err() {
             println!(
                 "Test vector '{}': Decryption with correct footer failed: {:?}",
-                vector.name, result_correct.unwrap_err()
+                vector.name,
+                result_correct.unwrap_err()
             );
             failed += 1;
             continue;
@@ -1254,11 +1456,7 @@ fn prop_v2_local_footer_validation() {
 
         // Test 2: Wrong footer should fail
         let wrong_footer = b"wrong-footer-value";
-        let result_wrong = verifier.v2_local_decrypt(
-            &vector.token,
-            &key,
-            Some(wrong_footer),
-        );
+        let result_wrong = verifier.v2_local_decrypt(&vector.token, &key, Some(wrong_footer));
 
         match result_wrong {
             Ok(_) => {
@@ -1281,7 +1479,8 @@ fn prop_v2_local_footer_validation() {
         footer_vectors.len()
     );
     assert_eq!(
-        failed, 0,
+        failed,
+        0,
         "v2.local: {} test vectors failed out of {}",
         failed,
         footer_vectors.len()
@@ -1302,11 +1501,7 @@ fn prop_v2_public_footer_validation() {
     let footer_vectors: Vec<_> = vectors
         .tests
         .iter()
-        .filter(|v| {
-            v.token.starts_with("v2.public.")
-            && !v.expect_fail
-            && !v.footer.is_empty()
-        })
+        .filter(|v| v.token.starts_with("v2.public.") && !v.expect_fail && !v.footer.is_empty())
         .collect();
 
     if footer_vectors.is_empty() {
@@ -1326,7 +1521,10 @@ fn prop_v2_public_footer_validation() {
                 continue;
             }
             Err(e) => {
-                println!("Test vector '{}': Failed to decode public key: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode public key: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -1336,22 +1534,22 @@ fn prop_v2_public_footer_validation() {
         let footer = match vector.footer_bytes() {
             Ok(f) => f,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode footer: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode footer: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
         };
 
-        let result_correct = verifier.v2_public_verify(
-            &vector.token,
-            &public_key,
-            Some(&footer),
-        );
+        let result_correct = verifier.v2_public_verify(&vector.token, &public_key, Some(&footer));
 
         if result_correct.is_err() {
             println!(
                 "Test vector '{}': Verification with correct footer failed: {:?}",
-                vector.name, result_correct.unwrap_err()
+                vector.name,
+                result_correct.unwrap_err()
             );
             failed += 1;
             continue;
@@ -1359,11 +1557,8 @@ fn prop_v2_public_footer_validation() {
 
         // Test 2: Wrong footer should fail
         let wrong_footer = b"wrong-footer-value";
-        let result_wrong = verifier.v2_public_verify(
-            &vector.token,
-            &public_key,
-            Some(wrong_footer),
-        );
+        let result_wrong =
+            verifier.v2_public_verify(&vector.token, &public_key, Some(wrong_footer));
 
         match result_wrong {
             Ok(_) => {
@@ -1386,7 +1581,8 @@ fn prop_v2_public_footer_validation() {
         footer_vectors.len()
     );
     assert_eq!(
-        failed, 0,
+        failed,
+        0,
         "v2.public: {} test vectors failed out of {}",
         failed,
         footer_vectors.len()
@@ -1412,11 +1608,7 @@ fn prop_v3_local_footer_validation() {
     let footer_vectors: Vec<_> = vectors
         .tests
         .iter()
-        .filter(|v| {
-            v.token.starts_with("v3.local.")
-            && !v.expect_fail
-            && !v.footer.is_empty()
-        })
+        .filter(|v| v.token.starts_with("v3.local.") && !v.expect_fail && !v.footer.is_empty())
         .collect();
 
     if footer_vectors.is_empty() {
@@ -1440,7 +1632,10 @@ fn prop_v3_local_footer_validation() {
         let implicit_assertion = match vector.implicit_assertion_bytes() {
             Ok(ia) => ia,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode implicit assertion: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode implicit assertion: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -1450,7 +1645,10 @@ fn prop_v3_local_footer_validation() {
         let footer = match vector.footer_bytes() {
             Ok(f) => f,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode footer: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode footer: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -1460,13 +1658,18 @@ fn prop_v3_local_footer_validation() {
             &vector.token,
             &key,
             Some(&footer),
-            if implicit_assertion.is_empty() { None } else { Some(&implicit_assertion) },
+            if implicit_assertion.is_empty() {
+                None
+            } else {
+                Some(&implicit_assertion)
+            },
         );
 
         if result_correct.is_err() {
             println!(
                 "Test vector '{}': Decryption with correct footer failed: {:?}",
-                vector.name, result_correct.unwrap_err()
+                vector.name,
+                result_correct.unwrap_err()
             );
             failed += 1;
             continue;
@@ -1478,7 +1681,11 @@ fn prop_v3_local_footer_validation() {
             &vector.token,
             &key,
             Some(wrong_footer),
-            if implicit_assertion.is_empty() { None } else { Some(&implicit_assertion) },
+            if implicit_assertion.is_empty() {
+                None
+            } else {
+                Some(&implicit_assertion)
+            },
         );
 
         match result_wrong {
@@ -1502,7 +1709,8 @@ fn prop_v3_local_footer_validation() {
         footer_vectors.len()
     );
     assert_eq!(
-        failed, 0,
+        failed,
+        0,
         "v3.local: {} test vectors failed out of {}",
         failed,
         footer_vectors.len()
@@ -1528,11 +1736,7 @@ fn prop_v3_public_footer_validation() {
     let footer_vectors: Vec<_> = vectors
         .tests
         .iter()
-        .filter(|v| {
-            v.token.starts_with("v3.public.")
-            && !v.expect_fail
-            && !v.footer.is_empty()
-        })
+        .filter(|v| v.token.starts_with("v3.public.") && !v.expect_fail && !v.footer.is_empty())
         .collect();
 
     if footer_vectors.is_empty() {
@@ -1552,7 +1756,10 @@ fn prop_v3_public_footer_validation() {
                 continue;
             }
             Err(e) => {
-                println!("Test vector '{}': Failed to decode public key: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode public key: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -1561,7 +1768,10 @@ fn prop_v3_public_footer_validation() {
         let implicit_assertion = match vector.implicit_assertion_bytes() {
             Ok(ia) => ia,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode implicit assertion: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode implicit assertion: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -1571,7 +1781,10 @@ fn prop_v3_public_footer_validation() {
         let footer = match vector.footer_bytes() {
             Ok(f) => f,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode footer: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode footer: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -1581,13 +1794,18 @@ fn prop_v3_public_footer_validation() {
             &vector.token,
             &public_key,
             Some(&footer),
-            if implicit_assertion.is_empty() { None } else { Some(&implicit_assertion) },
+            if implicit_assertion.is_empty() {
+                None
+            } else {
+                Some(&implicit_assertion)
+            },
         );
 
         if result_correct.is_err() {
             println!(
                 "Test vector '{}': Verification with correct footer failed: {:?}",
-                vector.name, result_correct.unwrap_err()
+                vector.name,
+                result_correct.unwrap_err()
             );
             failed += 1;
             continue;
@@ -1599,7 +1817,11 @@ fn prop_v3_public_footer_validation() {
             &vector.token,
             &public_key,
             Some(wrong_footer),
-            if implicit_assertion.is_empty() { None } else { Some(&implicit_assertion) },
+            if implicit_assertion.is_empty() {
+                None
+            } else {
+                Some(&implicit_assertion)
+            },
         );
 
         match result_wrong {
@@ -1623,7 +1845,8 @@ fn prop_v3_public_footer_validation() {
         footer_vectors.len()
     );
     assert_eq!(
-        failed, 0,
+        failed,
+        0,
         "v3.public: {} test vectors failed out of {}",
         failed,
         footer_vectors.len()
@@ -1651,11 +1874,7 @@ fn prop_v4_local_footer_validation() {
     let footer_vectors: Vec<_> = vectors
         .tests
         .iter()
-        .filter(|v| {
-            v.token.starts_with("v4.local.")
-            && !v.expect_fail
-            && !v.footer.is_empty()
-        })
+        .filter(|v| v.token.starts_with("v4.local.") && !v.expect_fail && !v.footer.is_empty())
         .collect();
 
     if footer_vectors.is_empty() {
@@ -1679,7 +1898,10 @@ fn prop_v4_local_footer_validation() {
         let implicit_assertion = match vector.implicit_assertion_bytes() {
             Ok(ia) => ia,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode implicit assertion: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode implicit assertion: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -1689,7 +1911,10 @@ fn prop_v4_local_footer_validation() {
         let footer = match vector.footer_bytes() {
             Ok(f) => f,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode footer: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode footer: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -1699,13 +1924,18 @@ fn prop_v4_local_footer_validation() {
             &vector.token,
             &key,
             Some(&footer),
-            if implicit_assertion.is_empty() { None } else { Some(&implicit_assertion) },
+            if implicit_assertion.is_empty() {
+                None
+            } else {
+                Some(&implicit_assertion)
+            },
         );
 
         if result_correct.is_err() {
             println!(
                 "Test vector '{}': Decryption with correct footer failed: {:?}",
-                vector.name, result_correct.unwrap_err()
+                vector.name,
+                result_correct.unwrap_err()
             );
             failed += 1;
             continue;
@@ -1717,7 +1947,11 @@ fn prop_v4_local_footer_validation() {
             &vector.token,
             &key,
             Some(wrong_footer),
-            if implicit_assertion.is_empty() { None } else { Some(&implicit_assertion) },
+            if implicit_assertion.is_empty() {
+                None
+            } else {
+                Some(&implicit_assertion)
+            },
         );
 
         match result_wrong {
@@ -1741,7 +1975,8 @@ fn prop_v4_local_footer_validation() {
         footer_vectors.len()
     );
     assert_eq!(
-        failed, 0,
+        failed,
+        0,
         "v4.local: {} test vectors failed out of {}",
         failed,
         footer_vectors.len()
@@ -1762,11 +1997,7 @@ fn prop_v4_public_footer_validation() {
     let footer_vectors: Vec<_> = vectors
         .tests
         .iter()
-        .filter(|v| {
-            v.token.starts_with("v4.public.")
-            && !v.expect_fail
-            && !v.footer.is_empty()
-        })
+        .filter(|v| v.token.starts_with("v4.public.") && !v.expect_fail && !v.footer.is_empty())
         .collect();
 
     if footer_vectors.is_empty() {
@@ -1786,7 +2017,10 @@ fn prop_v4_public_footer_validation() {
                 continue;
             }
             Err(e) => {
-                println!("Test vector '{}': Failed to decode public key: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode public key: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -1795,7 +2029,10 @@ fn prop_v4_public_footer_validation() {
         let implicit_assertion = match vector.implicit_assertion_bytes() {
             Ok(ia) => ia,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode implicit assertion: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode implicit assertion: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -1805,7 +2042,10 @@ fn prop_v4_public_footer_validation() {
         let footer = match vector.footer_bytes() {
             Ok(f) => f,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode footer: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode footer: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -1815,13 +2055,18 @@ fn prop_v4_public_footer_validation() {
             &vector.token,
             &public_key,
             Some(&footer),
-            if implicit_assertion.is_empty() { None } else { Some(&implicit_assertion) },
+            if implicit_assertion.is_empty() {
+                None
+            } else {
+                Some(&implicit_assertion)
+            },
         );
 
         if result_correct.is_err() {
             println!(
                 "Test vector '{}': Verification with correct footer failed: {:?}",
-                vector.name, result_correct.unwrap_err()
+                vector.name,
+                result_correct.unwrap_err()
             );
             failed += 1;
             continue;
@@ -1833,7 +2078,11 @@ fn prop_v4_public_footer_validation() {
             &vector.token,
             &public_key,
             Some(wrong_footer),
-            if implicit_assertion.is_empty() { None } else { Some(&implicit_assertion) },
+            if implicit_assertion.is_empty() {
+                None
+            } else {
+                Some(&implicit_assertion)
+            },
         );
 
         match result_wrong {
@@ -1857,7 +2106,8 @@ fn prop_v4_public_footer_validation() {
         footer_vectors.len()
     );
     assert_eq!(
-        failed, 0,
+        failed,
+        0,
         "v4.public: {} test vectors failed out of {}",
         failed,
         footer_vectors.len()
@@ -1888,9 +2138,7 @@ fn prop_v3_local_implicit_assertion_validation() {
         .tests
         .iter()
         .filter(|v| {
-            v.token.starts_with("v3.local.")
-            && !v.expect_fail
-            && !v.implicit_assertion.is_empty()
+            v.token.starts_with("v3.local.") && !v.expect_fail && !v.implicit_assertion.is_empty()
         })
         .collect();
 
@@ -1915,7 +2163,10 @@ fn prop_v3_local_implicit_assertion_validation() {
         let footer = match vector.footer_bytes() {
             Ok(f) => f,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode footer: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode footer: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -1925,7 +2176,10 @@ fn prop_v3_local_implicit_assertion_validation() {
         let implicit_assertion = match vector.implicit_assertion_bytes() {
             Ok(ia) => ia,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode implicit assertion: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode implicit assertion: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -1934,14 +2188,19 @@ fn prop_v3_local_implicit_assertion_validation() {
         let result_correct = verifier.v3_local_decrypt(
             &vector.token,
             &key,
-            if footer.is_empty() { None } else { Some(&footer) },
+            if footer.is_empty() {
+                None
+            } else {
+                Some(&footer)
+            },
             Some(&implicit_assertion),
         );
 
         if result_correct.is_err() {
             println!(
                 "Test vector '{}': Decryption with correct implicit assertion failed: {:?}",
-                vector.name, result_correct.unwrap_err()
+                vector.name,
+                result_correct.unwrap_err()
             );
             failed += 1;
             continue;
@@ -1952,7 +2211,11 @@ fn prop_v3_local_implicit_assertion_validation() {
         let result_wrong = verifier.v3_local_decrypt(
             &vector.token,
             &key,
-            if footer.is_empty() { None } else { Some(&footer) },
+            if footer.is_empty() {
+                None
+            } else {
+                Some(&footer)
+            },
             Some(wrong_ia),
         );
 
@@ -1977,7 +2240,8 @@ fn prop_v3_local_implicit_assertion_validation() {
         ia_vectors.len()
     );
     assert_eq!(
-        failed, 0,
+        failed,
+        0,
         "v3.local: {} test vectors failed out of {}",
         failed,
         ia_vectors.len()
@@ -2004,9 +2268,7 @@ fn prop_v3_public_implicit_assertion_validation() {
         .tests
         .iter()
         .filter(|v| {
-            v.token.starts_with("v3.public.")
-            && !v.expect_fail
-            && !v.implicit_assertion.is_empty()
+            v.token.starts_with("v3.public.") && !v.expect_fail && !v.implicit_assertion.is_empty()
         })
         .collect();
 
@@ -2027,7 +2289,10 @@ fn prop_v3_public_implicit_assertion_validation() {
                 continue;
             }
             Err(e) => {
-                println!("Test vector '{}': Failed to decode public key: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode public key: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -2036,7 +2301,10 @@ fn prop_v3_public_implicit_assertion_validation() {
         let footer = match vector.footer_bytes() {
             Ok(f) => f,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode footer: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode footer: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -2046,7 +2314,10 @@ fn prop_v3_public_implicit_assertion_validation() {
         let implicit_assertion = match vector.implicit_assertion_bytes() {
             Ok(ia) => ia,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode implicit assertion: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode implicit assertion: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -2055,14 +2326,19 @@ fn prop_v3_public_implicit_assertion_validation() {
         let result_correct = verifier.v3_public_verify(
             &vector.token,
             &public_key,
-            if footer.is_empty() { None } else { Some(&footer) },
+            if footer.is_empty() {
+                None
+            } else {
+                Some(&footer)
+            },
             Some(&implicit_assertion),
         );
 
         if result_correct.is_err() {
             println!(
                 "Test vector '{}': Verification with correct implicit assertion failed: {:?}",
-                vector.name, result_correct.unwrap_err()
+                vector.name,
+                result_correct.unwrap_err()
             );
             failed += 1;
             continue;
@@ -2073,7 +2349,11 @@ fn prop_v3_public_implicit_assertion_validation() {
         let result_wrong = verifier.v3_public_verify(
             &vector.token,
             &public_key,
-            if footer.is_empty() { None } else { Some(&footer) },
+            if footer.is_empty() {
+                None
+            } else {
+                Some(&footer)
+            },
             Some(wrong_ia),
         );
 
@@ -2098,7 +2378,8 @@ fn prop_v3_public_implicit_assertion_validation() {
         ia_vectors.len()
     );
     assert_eq!(
-        failed, 0,
+        failed,
+        0,
         "v3.public: {} test vectors failed out of {}",
         failed,
         ia_vectors.len()
@@ -2127,9 +2408,7 @@ fn prop_v4_local_implicit_assertion_validation() {
         .tests
         .iter()
         .filter(|v| {
-            v.token.starts_with("v4.local.")
-            && !v.expect_fail
-            && !v.implicit_assertion.is_empty()
+            v.token.starts_with("v4.local.") && !v.expect_fail && !v.implicit_assertion.is_empty()
         })
         .collect();
 
@@ -2154,7 +2433,10 @@ fn prop_v4_local_implicit_assertion_validation() {
         let footer = match vector.footer_bytes() {
             Ok(f) => f,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode footer: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode footer: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -2164,7 +2446,10 @@ fn prop_v4_local_implicit_assertion_validation() {
         let implicit_assertion = match vector.implicit_assertion_bytes() {
             Ok(ia) => ia,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode implicit assertion: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode implicit assertion: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -2173,14 +2458,19 @@ fn prop_v4_local_implicit_assertion_validation() {
         let result_correct = verifier.v4_local_decrypt(
             &vector.token,
             &key,
-            if footer.is_empty() { None } else { Some(&footer) },
+            if footer.is_empty() {
+                None
+            } else {
+                Some(&footer)
+            },
             Some(&implicit_assertion),
         );
 
         if result_correct.is_err() {
             println!(
                 "Test vector '{}': Decryption with correct implicit assertion failed: {:?}",
-                vector.name, result_correct.unwrap_err()
+                vector.name,
+                result_correct.unwrap_err()
             );
             failed += 1;
             continue;
@@ -2191,7 +2481,11 @@ fn prop_v4_local_implicit_assertion_validation() {
         let result_wrong = verifier.v4_local_decrypt(
             &vector.token,
             &key,
-            if footer.is_empty() { None } else { Some(&footer) },
+            if footer.is_empty() {
+                None
+            } else {
+                Some(&footer)
+            },
             Some(wrong_ia),
         );
 
@@ -2216,7 +2510,8 @@ fn prop_v4_local_implicit_assertion_validation() {
         ia_vectors.len()
     );
     assert_eq!(
-        failed, 0,
+        failed,
+        0,
         "v4.local: {} test vectors failed out of {}",
         failed,
         ia_vectors.len()
@@ -2238,9 +2533,7 @@ fn prop_v4_public_implicit_assertion_validation() {
         .tests
         .iter()
         .filter(|v| {
-            v.token.starts_with("v4.public.")
-            && !v.expect_fail
-            && !v.implicit_assertion.is_empty()
+            v.token.starts_with("v4.public.") && !v.expect_fail && !v.implicit_assertion.is_empty()
         })
         .collect();
 
@@ -2261,7 +2554,10 @@ fn prop_v4_public_implicit_assertion_validation() {
                 continue;
             }
             Err(e) => {
-                println!("Test vector '{}': Failed to decode public key: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode public key: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -2270,7 +2566,10 @@ fn prop_v4_public_implicit_assertion_validation() {
         let footer = match vector.footer_bytes() {
             Ok(f) => f,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode footer: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode footer: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -2280,7 +2579,10 @@ fn prop_v4_public_implicit_assertion_validation() {
         let implicit_assertion = match vector.implicit_assertion_bytes() {
             Ok(ia) => ia,
             Err(e) => {
-                println!("Test vector '{}': Failed to decode implicit assertion: {}", vector.name, e);
+                println!(
+                    "Test vector '{}': Failed to decode implicit assertion: {}",
+                    vector.name, e
+                );
                 failed += 1;
                 continue;
             }
@@ -2289,14 +2591,19 @@ fn prop_v4_public_implicit_assertion_validation() {
         let result_correct = verifier.v4_public_verify(
             &vector.token,
             &public_key,
-            if footer.is_empty() { None } else { Some(&footer) },
+            if footer.is_empty() {
+                None
+            } else {
+                Some(&footer)
+            },
             Some(&implicit_assertion),
         );
 
         if result_correct.is_err() {
             println!(
                 "Test vector '{}': Verification with correct implicit assertion failed: {:?}",
-                vector.name, result_correct.unwrap_err()
+                vector.name,
+                result_correct.unwrap_err()
             );
             failed += 1;
             continue;
@@ -2307,7 +2614,11 @@ fn prop_v4_public_implicit_assertion_validation() {
         let result_wrong = verifier.v4_public_verify(
             &vector.token,
             &public_key,
-            if footer.is_empty() { None } else { Some(&footer) },
+            if footer.is_empty() {
+                None
+            } else {
+                Some(&footer)
+            },
             Some(wrong_ia),
         );
 
@@ -2332,7 +2643,8 @@ fn prop_v4_public_implicit_assertion_validation() {
         ia_vectors.len()
     );
     assert_eq!(
-        failed, 0,
+        failed,
+        0,
         "v4.public: {} test vectors failed out of {}",
         failed,
         ia_vectors.len()

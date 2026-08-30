@@ -1,4 +1,4 @@
-use fast_paseto::test_vectors::{TestVectorFile, TestVector};
+use fast_paseto::test_vectors::{TestVector, TestVectorFile};
 use std::path::Path;
 
 #[test]

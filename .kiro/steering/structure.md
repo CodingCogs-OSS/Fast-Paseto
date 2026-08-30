@@ -1,136 +1,76 @@
----
-inclusion: always
----
-
 # Project Structure & Architecture
 
-## Core Architecture Pattern
+## Architecture Pattern
 
-This is a **Rust-Python hybrid library** where:
-- Rust (`src/`) implements ALL cryptographic operations and core logic
-- Python bindings expose the API via PyO3
-- Zero Python runtime dependencies (pure Rust extension)
+A **Rust-Python hybrid library**:
+- Rust (`src/`) implements ALL cryptographic operations and core logic.
+- PyO3 exposes the API to Python. The compiled extension is `fast_paseto._fast_paseto`, re-exported by the `fast_paseto` package in `python/fast_paseto/`.
+- `python/fast_paseto/_fast_paseto.pyi` is the Python-facing type surface and MUST stay in sync with the Rust bindings.
 
-## Critical File Locations
+## Rust Core (`src/`)
 
-### Rust Core (`src/`)
-- `lib.rs` - PyO3 module entry point, defines `#[pymodule]`, re-exports public types
-- `bindings.rs` - All `#[pyfunction]` implementations exposed to Python
-- `paseto.rs` - Main `Paseto` class with `#[pyclass]` and `#[pymethods]`
-- `token.rs` - Immutable `Token` class returned from decode operations
-- `error.rs` - `PasetoError` enum using `thiserror::Error`
-- `exceptions.rs` - Converts Rust errors to Python exceptions via `From<PasetoError> for PyErr`
-- `key_generator.rs` - Key generation functions
-- `key_manager.rs` - Key storage and management
-- `token_generator.rs` - Token creation logic
-- `token_verifier.rs` - Token verification logic
-- `claims_manager.rs` - Claims handling (exp, iat, etc.)
-- `payload.rs` - Payload data structures
-- `version.rs` - PASETO version handling (v2, v3, v4)
-- `pae.rs` - Pre-Authentication Encoding implementation
+| Module | Responsibility |
+|--------|----------------|
+| `lib.rs` | `#[pymodule] fn _fast_paseto` entry point; registers classes/functions; `pub use` re-exports |
+| `bindings.rs` | All `#[pyfunction]` implementations (`encode`, `decode`, `generate_*`, PASERK, PEM) |
+| `paseto.rs` | Stateful `Paseto` `#[pyclass]` with defaults (`default_exp`, `include_iat`, `leeway`) |
+| `token.rs` | Immutable `Token` class returned from decode |
+| `token_generator.rs` | Token creation logic |
+| `token_verifier.rs` | Token verification logic |
+| `claims_manager.rs` | Claim handling (exp, iat, leeway) |
+| `key_generator.rs` | Key/keypair generation (`Ed25519KeyPair`, `P384KeyPair`) |
+| `key_manager.rs` | PASERK key serialization, IDs, wrapping (`PaserkKey`, `PaserkId`) |
+| `payload.rs` | `TokenPayload` data structures |
+| `version.rs` | `Version` (v2/v3/v4) and `Purpose` (local/public) |
+| `pae.rs` | Pre-Authentication Encoding (`Pae`) |
+| `error.rs` | `PasetoError` enum (`thiserror`) |
+| `exceptions.rs` | `From<PasetoError> for PyErr`; Python exception classes |
+| `test_vectors.rs` | Official test-vector loading (feature `test-vectors`) |
 
-### Python Interface
-- `fast_paseto.pyi` - Type stubs defining the Python API surface (MUST stay in sync with Rust)
-- `main.py` - Example usage only (not part of the library)
+## Python Interface & Config
 
-### Configuration
-- `Cargo.toml` - Rust dependencies and build config (crate-type = "cdylib")
-- `pyproject.toml` - Python packaging, maturin build config, dev dependencies
+- `python/fast_paseto/` — Python package (maturin mixed layout, `python-source = "python"`):
+  - `__init__.py` — re-exports the compiled `_fast_paseto` extension.
+  - `_fast_paseto.pyi` — type stubs; **source of truth** for the Python API signatures.
+  - `__init__.pyi` — thin re-export of `_fast_paseto.pyi` for the package surface.
+  - `py.typed` — PEP 561 marker so type hints ship in the wheel.
+- `main.py` — example usage only, not part of the library.
+- `profiling/benchmark.py` — benchmarks vs. other libraries.
+- `Cargo.toml` — Rust deps, build config, feature-gated test targets.
+- `pyproject.toml` — maturin build config (`module-name = "fast_paseto._fast_paseto"`), Python dev tooling, pytest config.
 
-### Tests
-- `tests/python/` - pytest integration tests (test Python API)
-- `tests/rust/` - Rust unit and property tests
-- `tests/vectors/` - Official PASETO test vectors in JSON format
+## Tests
 
-## Module Responsibilities
+- `tests/python/` — pytest integration tests against the Python API (require `maturin develop`).
+- `tests/rust/` — Rust integration, property, and test-vector suites (vector suites need `--features test-vectors`).
+- `tests/vectors/` — official PASETO test vectors (`v2.json`, `v3.json`, `v4.json`).
 
-| Module | What It Does | Key Exports |
-|--------|--------------|-------------|
-| `lib.rs` | Defines the Python module, registers functions/classes | `#[pymodule] fn fast_paseto(...)` |
-| `bindings.rs` | Standalone Python functions | `encode()`, `decode()`, `generate_*()` |
-| `paseto.rs` | Stateful Paseto class with defaults | `Paseto` class |
-| `token.rs` | Decoded token container | `Token` class (immutable) |
-| `error.rs` | Error types | `PasetoError` enum |
-| `exceptions.rs` | Error conversion | `impl From<PasetoError> for PyErr` |
+## Adding Functionality
 
-## Adding New Functionality
+### New Python Function
+1. Implement in `src/bindings.rs` with `#[pyfunction]`.
+2. Register in `src/lib.rs` via `wrap_pyfunction!`.
+3. Add the signature to `python/fast_paseto/_fast_paseto.pyi` (and re-export it from `__init__.py` / `__init__.pyi`).
+4. `maturin develop` to rebuild.
+5. Add tests in `tests/python/`; verify with `cargo test && pytest`.
 
-### Adding a New Python Function
-1. Implement in `src/bindings.rs` with `#[pyfunction]` decorator
-2. Register in `src/lib.rs` using `.add_function(wrap_pyfunction!(...))`
-3. Add type signature to `fast_paseto.pyi`
-4. Run `maturin develop` to rebuild
-5. Add tests in `tests/python/`
-6. Verify with `cargo test && pytest`
-
-### Adding a New Python Class
-1. Create dedicated module in `src/` (e.g., `src/my_class.rs`)
-2. Use `#[pyclass]` on struct, `#[pymethods]` on impl block
-3. Re-export from `src/lib.rs` using `pub use`
-4. Register in `lib.rs` using `.add_class::<MyClass>()`
-5. Add type stubs to `fast_paseto.pyi`
-6. Run `maturin develop` to rebuild
-7. Add tests in `tests/python/`
+### New Python Class
+1. Create a focused module in `src/` (e.g., `src/my_class.rs`).
+2. `#[pyclass]` on the struct, `#[pymethods]` on the impl.
+3. `pub use` from `lib.rs` and register with `.add_class::<MyClass>()`.
+4. Add stubs to `python/fast_paseto/_fast_paseto.pyi` and re-export from `__init__.py` / `__init__.pyi`; `maturin develop`; add tests.
 
 ### Modifying Existing API
-1. Update Rust implementation in appropriate `src/` file
-2. Update `fast_paseto.pyi` to match new signature
-3. Run `maturin develop` to rebuild
-4. Update affected tests
-5. Validate type stubs: `uvx ty check`
-6. Run full test suite: `cargo test && pytest`
-
-## Dependency Management
-
-| Dependency Type | Location | Section | Example |
-|----------------|----------|---------|---------|
-| Rust runtime | `Cargo.toml` | `[dependencies]` | `ed25519-dalek`, `chacha20poly1305` |
-| Rust dev/test | `Cargo.toml` | `[dev-dependencies]` | `proptest`, `serde_json` |
-| Python dev/test | `pyproject.toml` | `[project.optional-dependencies]` | `pytest`, `hypothesis` |
-| Build tools | `pyproject.toml` | `[build-system.requires]` | `maturin` |
-
-**CRITICAL**: `[project.dependencies]` in `pyproject.toml` MUST remain empty (pure Rust extension).
-
-## Workflow Rules
-
-### After ANY Rust Change
-```bash
-maturin develop  # Rebuild the extension (REQUIRED)
-```
-
-### Before Committing
-```bash
-cargo fmt        # Format Rust code
-cargo clippy     # Lint Rust code
-ruff format .    # Format Python code
-ruff check .     # Lint Python code
-uvx ty check     # Validate type stubs
-cargo test       # Run Rust tests
-pytest           # Run Python tests
-```
-
-Or use: `pre-commit run --all-files`
-
-### Testing Workflow
-- Python tests REQUIRE `maturin develop` first (imports will fail otherwise)
-- Rust tests can run standalone with `cargo test`
-- Property tests use `hypothesis` (Python) and `proptest` (Rust)
+1. Update the Rust implementation.
+2. Update `python/fast_paseto/_fast_paseto.pyi` (and re-exports) to match.
+3. `maturin develop`; update affected tests.
+4. `uvx ty check`, then `cargo test && pytest`.
 
 ## Hard Constraints
 
-These rules MUST NOT be violated:
-
-1. **No Python runtime dependencies** - `[project.dependencies]` stays empty
-2. **All crypto in Rust** - Never implement cryptographic operations in Python
-3. **Rebuild after Rust changes** - Always run `maturin develop` after editing `src/`
-4. **Type stub sync** - `fast_paseto.pyi` must exactly match the Python-facing API
-5. **Python 3.11+ only** - Minimum supported version
-6. **Rust 2024 edition** - Use modern Rust idioms
-
-## Common Pitfalls
-
-- Forgetting to run `maturin develop` after Rust changes → ImportError
-- Adding dependencies to `[project.dependencies]` → Violates design
-- Implementing crypto in Python → Security risk
-- Type stubs out of sync → Type checking fails
-- Using `pip install -e .` → Wrong build tool (use `maturin develop`)
+1. All crypto in Rust — never in Python.
+2. Rebuild with `maturin develop` after every `src/` change.
+3. Keep `python/fast_paseto/_fast_paseto.pyi` exactly in sync with the Python-facing API.
+4. Keep Python runtime dependencies minimal (pure Rust extension).
+5. Python 3.11+, Rust 2024 edition only.
+6. One responsibility per module; put unit tests in a `#[cfg(test)]` block at the file bottom.

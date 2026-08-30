@@ -235,11 +235,7 @@ pub fn encode(
                 .try_into()
                 .map_err(|_| PasetoKeyError::new_err("Failed to convert key to array"))?;
             // v2 does not support implicit assertions
-            TokenGenerator::v2_local_encrypt(
-                &key_array,
-                &payload_bytes,
-                footer_bytes.as_deref(),
-            )?
+            TokenGenerator::v2_local_encrypt(&key_array, &payload_bytes, footer_bytes.as_deref())?
         }
         (Version::V2, Purpose::Public) => {
             // v2.public requires 64-byte secret key
@@ -999,11 +995,13 @@ pub fn secret_unwrap(
 ///
 /// # Examples
 ///
-///     >>> import fast_paseto
-///     >>> key = fast_paseto.generate_symmetric_key()
-///     >>> encrypted = fast_paseto.local_pw_encrypt(key, "my-password")
-///     >>> encrypted.startswith("k4.local-pw.")
-///     True
+/// ```text
+/// >>> import fast_paseto
+/// >>> key = fast_paseto.generate_symmetric_key()
+/// >>> encrypted = fast_paseto.local_pw_encrypt(key, "my-password")
+/// >>> encrypted.startswith("k4.local-pw.")
+/// True
+/// ```
 #[pyfunction]
 pub fn local_pw_encrypt(key: &[u8], password: &str) -> PyResult<String> {
     if key.len() != 32 {
@@ -1037,12 +1035,14 @@ pub fn local_pw_encrypt(key: &[u8], password: &str) -> PyResult<String> {
 ///
 /// # Examples
 ///
-///     >>> import fast_paseto
-///     >>> key = fast_paseto.generate_symmetric_key()
-///     >>> encrypted = fast_paseto.local_pw_encrypt(key, "my-password")
-///     >>> decrypted = fast_paseto.local_pw_decrypt(encrypted, "my-password")
-///     >>> decrypted == key
-///     True
+/// ```text
+/// >>> import fast_paseto
+/// >>> key = fast_paseto.generate_symmetric_key()
+/// >>> encrypted = fast_paseto.local_pw_encrypt(key, "my-password")
+/// >>> decrypted = fast_paseto.local_pw_decrypt(encrypted, "my-password")
+/// >>> decrypted == key
+/// True
+/// ```
 #[pyfunction]
 pub fn local_pw_decrypt(py: Python<'_>, encrypted: &str, password: &str) -> PyResult<Py<PyBytes>> {
     let decrypted = KeyManager::local_pw_decrypt(encrypted, password)?;
@@ -1070,11 +1070,13 @@ pub fn local_pw_decrypt(py: Python<'_>, encrypted: &str, password: &str) -> PyRe
 ///
 /// # Examples
 ///
-///     >>> import fast_paseto
-///     >>> secret_key, public_key = fast_paseto.generate_keypair()
-///     >>> encrypted = fast_paseto.secret_pw_encrypt(secret_key, "my-password")
-///     >>> encrypted.startswith("k4.secret-pw.")
-///     True
+/// ```text
+/// >>> import fast_paseto
+/// >>> secret_key, public_key = fast_paseto.generate_keypair()
+/// >>> encrypted = fast_paseto.secret_pw_encrypt(secret_key, "my-password")
+/// >>> encrypted.startswith("k4.secret-pw.")
+/// True
+/// ```
 #[pyfunction]
 pub fn secret_pw_encrypt(secret_key: &[u8], password: &str) -> PyResult<String> {
     if secret_key.len() != 64 {
@@ -1108,12 +1110,14 @@ pub fn secret_pw_encrypt(secret_key: &[u8], password: &str) -> PyResult<String> 
 ///
 /// # Examples
 ///
-///     >>> import fast_paseto
-///     >>> secret_key, public_key = fast_paseto.generate_keypair()
-///     >>> encrypted = fast_paseto.secret_pw_encrypt(secret_key, "my-password")
-///     >>> decrypted = fast_paseto.secret_pw_decrypt(encrypted, "my-password")
-///     >>> decrypted == secret_key
-///     True
+/// ```text
+/// >>> import fast_paseto
+/// >>> secret_key, public_key = fast_paseto.generate_keypair()
+/// >>> encrypted = fast_paseto.secret_pw_encrypt(secret_key, "my-password")
+/// >>> decrypted = fast_paseto.secret_pw_decrypt(encrypted, "my-password")
+/// >>> decrypted == secret_key
+/// True
+/// ```
 #[pyfunction]
 pub fn secret_pw_decrypt(py: Python<'_>, encrypted: &str, password: &str) -> PyResult<Py<PyBytes>> {
     let decrypted = KeyManager::secret_pw_decrypt(encrypted, password)?;

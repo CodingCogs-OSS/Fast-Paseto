@@ -195,6 +195,9 @@ mod tests {
     #[allow(unused_imports)]
     use p384::elliptic_curve::sec1::ToEncodedPoint;
     use proptest::prelude::*;
+    // Disambiguate `RngCore` (brought in by both `super::*` and
+    // `proptest::prelude::*`) so `.fill_bytes` resolves unambiguously.
+    use rand::RngCore;
 
     #[test]
     fn test_generate_symmetric_key_length() {
@@ -412,7 +415,7 @@ mod tests {
 
             let encoded = KeyGenerator::key_to_base64(&key);
             let decoded = KeyGenerator::key_from_base64(&encoded)
-                .expect(&format!("Decoding should succeed for size {}", size));
+                .unwrap_or_else(|_| panic!("Decoding should succeed for size {}", size));
 
             assert_eq!(key, decoded, "Round-trip failed for size {}", size);
         }
@@ -480,7 +483,7 @@ mod tests {
             .expect("Generated secret key should be valid");
 
         // Reconstruct the verifying key from the public key bytes (compressed point)
-        let encoded_point = EncodedPoint::from_bytes(&keypair.public_key)
+        let encoded_point = EncodedPoint::from_bytes(keypair.public_key)
             .expect("Generated public key should be valid encoded point");
         let public_key = PublicKey::from_encoded_point(&encoded_point)
             .expect("Generated public key should be valid");

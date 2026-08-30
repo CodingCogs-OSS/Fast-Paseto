@@ -1319,7 +1319,7 @@ mod tests {
     #[test]
     fn test_from_paserk_invalid_local_key_length() {
         // Create a base64url-encoded 16-byte key (wrong length for local)
-        let short_key = BASE64_URL_SAFE_NO_PAD.encode(&[0u8; 16]);
+        let short_key = BASE64_URL_SAFE_NO_PAD.encode([0u8; 16]);
         let result = KeyManager::from_paserk(&format!("k4.local.{}", short_key));
         assert!(result.is_err());
         match result {
@@ -1333,7 +1333,7 @@ mod tests {
     #[test]
     fn test_from_paserk_invalid_secret_key_length() {
         // Create a base64url-encoded 32-byte key (wrong length for secret)
-        let short_key = BASE64_URL_SAFE_NO_PAD.encode(&[0u8; 32]);
+        let short_key = BASE64_URL_SAFE_NO_PAD.encode([0u8; 32]);
         let result = KeyManager::from_paserk(&format!("k4.secret.{}", short_key));
         assert!(result.is_err());
         match result {
@@ -1347,7 +1347,7 @@ mod tests {
     #[test]
     fn test_from_paserk_invalid_public_key_length() {
         // Create a base64url-encoded 16-byte key (wrong length for public)
-        let short_key = BASE64_URL_SAFE_NO_PAD.encode(&[0u8; 16]);
+        let short_key = BASE64_URL_SAFE_NO_PAD.encode([0u8; 16]);
         let result = KeyManager::from_paserk(&format!("k4.public.{}", short_key));
         assert!(result.is_err());
         match result {

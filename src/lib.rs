@@ -103,8 +103,11 @@ pub use token_verifier::TokenVerifier;
 pub use version::{Purpose, Version};
 
 /// A Python module implemented in Rust.
+///
+/// The compiled extension is exposed as `fast_paseto._fast_paseto` and
+/// re-exported by the `fast_paseto` Python package (see `python/fast_paseto`).
 #[pymodule]
-fn fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn _fast_paseto(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Register Paseto class
     m.add_class::<Paseto>()?;
 

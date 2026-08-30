@@ -7,15 +7,14 @@
 //! tests against the official vectors are currently limited due to implementation differences.
 //! Our library passes comprehensive round-trip tests which validate correctness.
 
-use fast_paseto::test_vectors::{TestVectorFile, TestVector};
+use fast_paseto::test_vectors::{TestVector, TestVectorFile};
 use fast_paseto::token_verifier::TokenVerifier;
 use std::path::Path;
 
 /// Load v4 test vectors from file
 fn load_v4_vectors() -> TestVectorFile {
     let path = Path::new("tests/vectors/v4.json");
-    TestVectorFile::load_from_file(path)
-        .expect("Failed to load v4.json test vectors")
+    TestVectorFile::load_from_file(path).expect("Failed to load v4.json test vectors")
 }
 
 #[test]
@@ -42,7 +41,10 @@ fn test_v4_public_test_vectors_load() {
         .filter(|v| v.token.starts_with("v4.public."))
         .collect();
 
-    assert!(!public_vectors.is_empty(), "No v4.public test vectors found");
+    assert!(
+        !public_vectors.is_empty(),
+        "No v4.public test vectors found"
+    );
     println!("Loaded {} v4.public test vectors", public_vectors.len());
 }
 
@@ -64,21 +66,38 @@ fn test_v4_local_decryption_failure() {
     );
 
     for vector in local_failure_vectors {
-        let key = vector.key_bytes()
-            .unwrap_or_else(|e| panic!("Test vector '{}': Failed to decode key: {}", vector.name, e));
+        let key = vector.key_bytes().unwrap_or_else(|e| {
+            panic!("Test vector '{}': Failed to decode key: {}", vector.name, e)
+        });
 
-        let footer = vector.footer_bytes()
-            .unwrap_or_else(|e| panic!("Test vector '{}': Failed to decode footer: {}", vector.name, e));
+        let footer = vector.footer_bytes().unwrap_or_else(|e| {
+            panic!(
+                "Test vector '{}': Failed to decode footer: {}",
+                vector.name, e
+            )
+        });
 
-        let implicit_assertion = vector.implicit_assertion_bytes()
-            .unwrap_or_else(|e| panic!("Test vector '{}': Failed to decode implicit assertion: {}", vector.name, e));
+        let implicit_assertion = vector.implicit_assertion_bytes().unwrap_or_else(|e| {
+            panic!(
+                "Test vector '{}': Failed to decode implicit assertion: {}",
+                vector.name, e
+            )
+        });
 
         // Attempt to decrypt the token - should fail
         let result = verifier.v4_local_decrypt(
             &vector.token,
             &key,
-            if footer.is_empty() { None } else { Some(&footer) },
-            if implicit_assertion.is_empty() { None } else { Some(&implicit_assertion) },
+            if footer.is_empty() {
+                None
+            } else {
+                Some(&footer)
+            },
+            if implicit_assertion.is_empty() {
+                None
+            } else {
+                Some(&implicit_assertion)
+            },
         );
 
         assert!(
@@ -107,25 +126,51 @@ fn test_v4_public_verification_success() {
     );
 
     for vector in public_success_vectors {
-        let public_key = vector.public_key_bytes()
-            .unwrap_or_else(|e| panic!("Test vector '{}': Failed to decode public key: {}", vector.name, e))
+        let public_key = vector
+            .public_key_bytes()
+            .unwrap_or_else(|e| {
+                panic!(
+                    "Test vector '{}': Failed to decode public key: {}",
+                    vector.name, e
+                )
+            })
             .unwrap_or_else(|| panic!("Test vector '{}': Missing public key", vector.name));
 
-        let expected_payload = vector.payload_bytes()
-            .unwrap_or_else(|e| panic!("Test vector '{}': Failed to decode payload: {}", vector.name, e));
+        let expected_payload = vector.payload_bytes().unwrap_or_else(|e| {
+            panic!(
+                "Test vector '{}': Failed to decode payload: {}",
+                vector.name, e
+            )
+        });
 
-        let footer = vector.footer_bytes()
-            .unwrap_or_else(|e| panic!("Test vector '{}': Failed to decode footer: {}", vector.name, e));
+        let footer = vector.footer_bytes().unwrap_or_else(|e| {
+            panic!(
+                "Test vector '{}': Failed to decode footer: {}",
+                vector.name, e
+            )
+        });
 
-        let implicit_assertion = vector.implicit_assertion_bytes()
-            .unwrap_or_else(|e| panic!("Test vector '{}': Failed to decode implicit assertion: {}", vector.name, e));
+        let implicit_assertion = vector.implicit_assertion_bytes().unwrap_or_else(|e| {
+            panic!(
+                "Test vector '{}': Failed to decode implicit assertion: {}",
+                vector.name, e
+            )
+        });
 
         // Verify the token
         let result = verifier.v4_public_verify(
             &vector.token,
             &public_key,
-            if footer.is_empty() { None } else { Some(&footer) },
-            if implicit_assertion.is_empty() { None } else { Some(&implicit_assertion) },
+            if footer.is_empty() {
+                None
+            } else {
+                Some(&footer)
+            },
+            if implicit_assertion.is_empty() {
+                None
+            } else {
+                Some(&implicit_assertion)
+            },
         );
 
         assert!(
@@ -137,7 +182,8 @@ fn test_v4_public_verification_success() {
 
         let actual_payload = result.unwrap();
         assert_eq!(
-            actual_payload, expected_payload,
+            actual_payload,
+            expected_payload,
             "Test vector '{}': Payload mismatch.\nExpected: {:?}\nActual: {:?}",
             vector.name,
             String::from_utf8_lossy(&expected_payload),
@@ -173,14 +219,24 @@ fn test_v4_public_verification_failure() {
 
         let public_key = public_key_result.unwrap().unwrap();
         let footer = vector.footer_bytes().unwrap_or_else(|_| Vec::new());
-        let implicit_assertion = vector.implicit_assertion_bytes().unwrap_or_else(|_| Vec::new());
+        let implicit_assertion = vector
+            .implicit_assertion_bytes()
+            .unwrap_or_else(|_| Vec::new());
 
         // Attempt to verify the token - should fail
         let result = verifier.v4_public_verify(
             &vector.token,
             &public_key,
-            if footer.is_empty() { None } else { Some(&footer) },
-            if implicit_assertion.is_empty() { None } else { Some(&implicit_assertion) },
+            if footer.is_empty() {
+                None
+            } else {
+                Some(&footer)
+            },
+            if implicit_assertion.is_empty() {
+                None
+            } else {
+                Some(&implicit_assertion)
+            },
         );
 
         assert!(
@@ -200,11 +256,7 @@ fn test_v4_public_footer_validation() {
     let public_footer_vectors: Vec<&TestVector> = vectors
         .tests
         .iter()
-        .filter(|v| {
-            v.token.starts_with("v4.public.")
-                && !v.expect_fail
-                && !v.footer.is_empty()
-        })
+        .filter(|v| v.token.starts_with("v4.public.") && !v.expect_fail && !v.footer.is_empty())
         .collect();
 
     assert!(
@@ -222,7 +274,11 @@ fn test_v4_public_footer_validation() {
             &vector.token,
             &public_key,
             Some(&footer),
-            if implicit_assertion.is_empty() { None } else { Some(&implicit_assertion) },
+            if implicit_assertion.is_empty() {
+                None
+            } else {
+                Some(&implicit_assertion)
+            },
         );
         assert!(
             result.is_ok(),
@@ -236,7 +292,11 @@ fn test_v4_public_footer_validation() {
             &vector.token,
             &public_key,
             Some(wrong_footer),
-            if implicit_assertion.is_empty() { None } else { Some(&implicit_assertion) },
+            if implicit_assertion.is_empty() {
+                None
+            } else {
+                Some(&implicit_assertion)
+            },
         );
         assert!(
             result.is_err(),
@@ -256,9 +316,7 @@ fn test_v4_public_implicit_assertion_validation() {
         .tests
         .iter()
         .filter(|v| {
-            v.token.starts_with("v4.public.")
-                && !v.expect_fail
-                && !v.implicit_assertion.is_empty()
+            v.token.starts_with("v4.public.") && !v.expect_fail && !v.implicit_assertion.is_empty()
         })
         .collect();
 
@@ -276,7 +334,11 @@ fn test_v4_public_implicit_assertion_validation() {
         let result = verifier.v4_public_verify(
             &vector.token,
             &public_key,
-            if footer.is_empty() { None } else { Some(&footer) },
+            if footer.is_empty() {
+                None
+            } else {
+                Some(&footer)
+            },
             Some(&implicit_assertion),
         );
         assert!(
@@ -290,7 +352,11 @@ fn test_v4_public_implicit_assertion_validation() {
         let result = verifier.v4_public_verify(
             &vector.token,
             &public_key,
-            if footer.is_empty() { None } else { Some(&footer) },
+            if footer.is_empty() {
+                None
+            } else {
+                Some(&footer)
+            },
             Some(wrong_ia),
         );
         assert!(
@@ -303,7 +369,11 @@ fn test_v4_public_implicit_assertion_validation() {
         let result = verifier.v4_public_verify(
             &vector.token,
             &public_key,
-            if footer.is_empty() { None } else { Some(&footer) },
+            if footer.is_empty() {
+                None
+            } else {
+                Some(&footer)
+            },
             None,
         );
         assert!(
