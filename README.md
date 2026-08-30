@@ -13,20 +13,65 @@ A high-performance [PASETO](https://paseto.io/) (Platform-Agnostic Security Toke
 
 ## Performance
 
-Benchmarked against [pyseto](https://github.com/dajiaji/pyseto), the most popular Python PASETO library.
+Time per operation, lower is better. Measured on Python 3.11 / Windows 11 (i7-13xxH) with a
+release build. Every library performs the same logical work: v4 tokens, the same claims dict,
+JSON serialization included.
 
-| Operation | fast-paseto | pyseto | Speedup |
-|-----------|-------------|--------|---------|
-| generate_symmetric_key | 0.2 µs | 1.1 µs | 6x |
-| generate_keypair | 16 µs | 80 µs | 5x |
-| v4.local encode | 5 µs | 16 µs | 3x |
-| v4.local decode | 5 µs | 18 µs | 3.5x |
-| v4.public encode (sign) | 43 µs | 41 µs | ~1x |
-| v4.public decode (verify) | 37 µs | 98 µs | 2.7x |
+| Operation | fast-paseto | [pyseto](https://github.com/dajiaji/pyseto) | [python-paseto](https://github.com/purificant/python-paseto) | [pypaseto](https://github.com/rlittlefield/pypaseto) | [PyJWT](https://github.com/jpadilla/pyjwt) |
+|-----------|-------------|--------|---------------|----------|-------|
+| generate symmetric key | **0.11 µs** | 1.03 µs | 0.67 µs | 0.47 µs | 0.18 µs |
+| generate keypair | **14.2 µs** | 74.5 µs | 27.7 µs | 26.1 µs | 30.4 µs |
+| v4.local encode | **4.33 µs** | 19.0 µs | 8.98 µs | 13.1 µs | 9.28 µs |
+| v4.local decode | **4.02 µs** | 21.5 µs | 9.68 µs | 12.6 µs | 11.4 µs |
+| v4.public encode (sign) | 35.8 µs | 40.0 µs | 32.3 µs | **32.0 µs** | 36.5 µs |
+| v4.public decode (verify) | **34.9 µs** | 99.9 µs | 86.4 µs | 87.6 µs | 94.1 µs |
 
-Note: [python-paseto](https://github.com/purificant/python-paseto) requires libsodium and was excluded from benchmarks.
+Relative to fast-paseto (higher means slower than fast-paseto):
 
-Run benchmarks yourself: `python profiling/benchmark.py`
+| Operation | pyseto | python-paseto | pypaseto | PyJWT |
+|-----------|--------|---------------|----------|-------|
+| generate symmetric key | 9.3x | 6.1x | 4.3x | 1.7x |
+| generate keypair | 5.2x | 1.9x | 1.8x | 2.1x |
+| v4.local encode | 4.4x | 2.1x | 3.0x | 2.1x |
+| v4.local decode | 5.3x | 2.4x | 3.1x | 2.8x |
+| v4.public encode (sign) | 1.1x | 0.9x | 0.9x | 1.0x |
+| v4.public decode (verify) | 2.9x | 2.5x | 2.5x | 2.7x |
+
+Reading the numbers:
+
+- Symmetric paths are where the Rust core pays off most: 4-5x faster than the other PASETO
+  libraries on encode/decode, and roughly 9x on key generation versus pyseto.
+- Ed25519 **signing** is a wash. The libsodium-backed libraries edge ahead by roughly 10%,
+  because that operation is dominated by the same underlying primitive everywhere.
+  Ed25519 **verification** is ~2.5x faster in fast-paseto.
+- PyJWT is included as a reference point, not a like-for-like comparison. Its "local" rows are
+  HS256, which is *signed but not encrypted*, so it is doing strictly less work than a PASETO
+  local token yet still comes out slower.
+
+### Running the benchmarks
+
+```bash
+python profiling/benchmark.py                     # all libraries
+python profiling/benchmark.py --only pyseto pyjwt  # a subset
+python profiling/benchmark.py --json out.json     # keep the raw timings
+```
+
+`python-paseto` and `pypaseto` both ship a top-level `paseto` module, so they cannot be
+installed side by side. The benchmark works around this by measuring each library in its own
+throwaway environment via `uv run --no-project --with <package>`; nothing but fast-paseto needs
+to be present in your venv.
+
+Both of those libraries also bind libsodium through `pysodium`, so it must be installed for
+their rows to appear:
+
+```bash
+sudo apt install libsodium23        # Debian/Ubuntu
+brew install libsodium              # macOS
+# Windows: put libsodium.dll on PATH, or point LIBSODIUM_DIR at its folder
+```
+
+Libraries that cannot be loaded are reported as unavailable with the reason, rather than
+silently dropped from the table.
 
 ## Installation
 

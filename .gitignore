@@ -53,4 +53,5 @@ python/fast_paseto/__pycache__/
 .kiro/specs/
 
 # Profiling
-profiling/
+# profiling/benchmark.py is tracked; only its machine-specific output is not.
+profiling/results.json

@@ -29,6 +29,11 @@ dev = [
     "ty>=0.0.6",
 ]
 
+[tool.ty.src]
+# The benchmark script imports competitor libraries that are intentionally not
+# installed in this environment; it runs them in throwaway `uv run` envs.
+exclude = ["profiling"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests/python"]
 python_files = ["test_*.py"]
