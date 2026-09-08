@@ -30,10 +30,19 @@ jobs:
           components: rustfmt, clippy
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v2
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      # The Rust property tests embed the CPython interpreter, so the test
+      # binary links libpython3.11.so.1.0 and needs it on the loader path.
+      - name: Pin interpreter for PyO3 and uv
+        run: |
+          echo "PYO3_PYTHON=$pythonLocation/bin/python" >> "$GITHUB_ENV"
+          echo "UV_PYTHON=$pythonLocation/bin/python" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$pythonLocation/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
       - name: Rust format check
         run: cargo fmt --all -- --check
       - name: Clippy
