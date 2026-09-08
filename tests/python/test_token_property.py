@@ -125,9 +125,9 @@ def test_token_dict_like_access(payload, footer, version, purpose):
         assert token[key] == value, f"token['{key}'] should equal payload['{key}']"
 
     # Test that non-existent keys are not in token
-    assert (
-        "nonexistent_key_12345" not in token
-    ), "Non-existent key should not be in token"
+    assert "nonexistent_key_12345" not in token, (
+        "Non-existent key should not be in token"
+    )
 
 
 @given(

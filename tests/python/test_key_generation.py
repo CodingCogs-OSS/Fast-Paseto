@@ -34,20 +34,20 @@ def test_generate_keypair():
     secret_key, public_key = fast_paseto.generate_keypair()
 
     # Check types
-    assert isinstance(
-        secret_key, bytes
-    ), f"Expected bytes for secret_key, got {type(secret_key)}"
-    assert isinstance(
-        public_key, bytes
-    ), f"Expected bytes for public_key, got {type(public_key)}"
+    assert isinstance(secret_key, bytes), (
+        f"Expected bytes for secret_key, got {type(secret_key)}"
+    )
+    assert isinstance(public_key, bytes), (
+        f"Expected bytes for public_key, got {type(public_key)}"
+    )
 
     # Check lengths
-    assert (
-        len(secret_key) == 64
-    ), f"Expected 64 bytes for secret_key, got {len(secret_key)}"
-    assert (
-        len(public_key) == 32
-    ), f"Expected 32 bytes for public_key, got {len(public_key)}"
+    assert len(secret_key) == 64, (
+        f"Expected 64 bytes for secret_key, got {len(secret_key)}"
+    )
+    assert len(public_key) == 32, (
+        f"Expected 32 bytes for public_key, got {len(public_key)}"
+    )
 
     # Generate another keypair and ensure they're different
     secret_key2, public_key2 = fast_paseto.generate_keypair()
@@ -77,15 +77,15 @@ def test_multiple_generations():
 
     # Ensure all secret keys are unique
     unique_secrets = set(sk for sk, _ in keypairs)
-    assert (
-        len(unique_secrets) == 10
-    ), f"Expected 10 unique secret keys, got {len(unique_secrets)}"
+    assert len(unique_secrets) == 10, (
+        f"Expected 10 unique secret keys, got {len(unique_secrets)}"
+    )
 
     # Ensure all public keys are unique
     unique_publics = set(pk for _, pk in keypairs)
-    assert (
-        len(unique_publics) == 10
-    ), f"Expected 10 unique public keys, got {len(unique_publics)}"
+    assert len(unique_publics) == 10, (
+        f"Expected 10 unique public keys, got {len(unique_publics)}"
+    )
 
     print("✓ Generated 10 unique symmetric keys")
     print("✓ Generated 10 unique Ed25519 keypairs")

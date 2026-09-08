@@ -63,27 +63,27 @@ def test_paseto_instance_default_exp_application(payload, default_exp):
     decoded = paseto.decode(token, key, purpose="local")
 
     # Requirement 13.1: exp claim should be present
-    assert (
-        "exp" in decoded.payload
-    ), "Token should have exp claim when default_exp is set"
+    assert "exp" in decoded.payload, (
+        "Token should have exp claim when default_exp is set"
+    )
 
     # Requirement 13.4: exp claim should be approximately current_time + default_exp
     exp_value = decoded.payload["exp"]
     expected_exp_min = time_before + default_exp
     expected_exp_max = time_after + default_exp + 1  # Add 1 second tolerance
 
-    assert (
-        expected_exp_min <= exp_value <= expected_exp_max
-    ), f"exp claim should be approximately current_time + {default_exp}, got {exp_value}, expected between {expected_exp_min} and {expected_exp_max}"
+    assert expected_exp_min <= exp_value <= expected_exp_max, (
+        f"exp claim should be approximately current_time + {default_exp}, got {exp_value}, expected between {expected_exp_min} and {expected_exp_max}"
+    )
 
     # Verify original payload fields are preserved
     for key_name, value in payload.items():
-        assert (
-            key_name in decoded.payload
-        ), f"Original payload field '{key_name}' should be preserved"
-        assert (
-            decoded.payload[key_name] == value
-        ), f"Original payload field '{key_name}' value should be preserved"
+        assert key_name in decoded.payload, (
+            f"Original payload field '{key_name}' should be preserved"
+        )
+        assert decoded.payload[key_name] == value, (
+            f"Original payload field '{key_name}' value should be preserved"
+        )
 
 
 @given(
@@ -119,25 +119,27 @@ def test_paseto_instance_default_iat_application(payload):
     decoded = paseto.decode(token, key, purpose="local")
 
     # Requirement 13.2: iat claim should be present
-    assert (
-        "iat" in decoded.payload
-    ), "Token should have iat claim when include_iat is True"
+    assert "iat" in decoded.payload, (
+        "Token should have iat claim when include_iat is True"
+    )
 
     # Requirement 13.4: iat claim should be approximately current_time
     iat_value = decoded.payload["iat"]
 
     assert (
         time_before <= iat_value <= time_after + 1  # Add 1 second tolerance
-    ), f"iat claim should be approximately current_time, got {iat_value}, expected between {time_before} and {time_after}"
+    ), (
+        f"iat claim should be approximately current_time, got {iat_value}, expected between {time_before} and {time_after}"
+    )
 
     # Verify original payload fields are preserved
     for key_name, value in payload.items():
-        assert (
-            key_name in decoded.payload
-        ), f"Original payload field '{key_name}' should be preserved"
-        assert (
-            decoded.payload[key_name] == value
-        ), f"Original payload field '{key_name}' value should be preserved"
+        assert key_name in decoded.payload, (
+            f"Original payload field '{key_name}' should be preserved"
+        )
+        assert decoded.payload[key_name] == value, (
+            f"Original payload field '{key_name}' value should be preserved"
+        )
 
 
 @given(
@@ -175,23 +177,23 @@ def test_paseto_instance_both_defaults_application(payload, default_exp):
     decoded = paseto.decode(token, key, purpose="local")
 
     # Requirement 13.1: exp claim should be present
-    assert (
-        "exp" in decoded.payload
-    ), "Token should have exp claim when default_exp is set"
+    assert "exp" in decoded.payload, (
+        "Token should have exp claim when default_exp is set"
+    )
 
     # Requirement 13.2: iat claim should be present
-    assert (
-        "iat" in decoded.payload
-    ), "Token should have iat claim when include_iat is True"
+    assert "iat" in decoded.payload, (
+        "Token should have iat claim when include_iat is True"
+    )
 
     # Requirement 13.4: exp claim should be approximately current_time + default_exp
     exp_value = decoded.payload["exp"]
     expected_exp_min = time_before + default_exp
     expected_exp_max = time_after + default_exp + 1  # Add 1 second tolerance
 
-    assert (
-        expected_exp_min <= exp_value <= expected_exp_max
-    ), f"exp claim should be approximately current_time + {default_exp}"
+    assert expected_exp_min <= exp_value <= expected_exp_max, (
+        f"exp claim should be approximately current_time + {default_exp}"
+    )
 
     # Requirement 13.4: iat claim should be approximately current_time
     iat_value = decoded.payload["iat"]
@@ -202,12 +204,12 @@ def test_paseto_instance_both_defaults_application(payload, default_exp):
 
     # Verify original payload fields are preserved
     for key_name, value in payload.items():
-        assert (
-            key_name in decoded.payload
-        ), f"Original payload field '{key_name}' should be preserved"
-        assert (
-            decoded.payload[key_name] == value
-        ), f"Original payload field '{key_name}' value should be preserved"
+        assert key_name in decoded.payload, (
+            f"Original payload field '{key_name}' should be preserved"
+        )
+        assert decoded.payload[key_name] == value, (
+            f"Original payload field '{key_name}' value should be preserved"
+        )
 
 
 @given(
@@ -241,12 +243,12 @@ def test_paseto_instance_no_defaults_override(payload):
     decoded = paseto.decode(token, key, purpose="local")
 
     # Verify explicit claims were NOT overridden
-    assert (
-        decoded.payload["exp"] == explicit_exp
-    ), "Explicit exp claim should not be overridden"
-    assert (
-        decoded.payload["iat"] == explicit_iat
-    ), "Explicit iat claim should not be overridden"
+    assert decoded.payload["exp"] == explicit_exp, (
+        "Explicit exp claim should not be overridden"
+    )
+    assert decoded.payload["iat"] == explicit_iat, (
+        "Explicit iat claim should not be overridden"
+    )
 
 
 @given(

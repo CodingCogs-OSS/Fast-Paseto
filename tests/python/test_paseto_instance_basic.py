@@ -45,18 +45,18 @@ def test_paseto_instance_basic():
     exp_value = decoded.payload["exp"]
     expected_exp = current_time + 3600
     # Allow 5 second tolerance for test execution time
-    assert (
-        abs(exp_value - expected_exp) <= 5
-    ), f"exp should be approximately {expected_exp}, got {exp_value}"
+    assert abs(exp_value - expected_exp) <= 5, (
+        f"exp should be approximately {expected_exp}, got {exp_value}"
+    )
     print(f"✓ exp claim is correct: {exp_value} (expected ~{expected_exp})")
     print()
 
     # Test 5: Verify iat is approximately current_time
     print("Test 5: Verify iat is approximately current_time")
     iat_value = decoded.payload["iat"]
-    assert (
-        abs(iat_value - current_time) <= 5
-    ), f"iat should be approximately {current_time}, got {iat_value}"
+    assert abs(iat_value - current_time) <= 5, (
+        f"iat should be approximately {current_time}, got {iat_value}"
+    )
     print(f"✓ iat claim is correct: {iat_value} (expected ~{current_time})")
     print()
 
@@ -67,12 +67,12 @@ def test_paseto_instance_basic():
     payload_with_claims = {"sub": "user456", "exp": explicit_exp, "iat": explicit_iat}
     token2 = paseto.encode(key, payload_with_claims, purpose="local")
     decoded2 = paseto.decode(token2, key, purpose="local")
-    assert (
-        decoded2.payload["exp"] == explicit_exp
-    ), "Explicit exp should not be overridden"
-    assert (
-        decoded2.payload["iat"] == explicit_iat
-    ), "Explicit iat should not be overridden"
+    assert decoded2.payload["exp"] == explicit_exp, (
+        "Explicit exp should not be overridden"
+    )
+    assert decoded2.payload["iat"] == explicit_iat, (
+        "Explicit iat should not be overridden"
+    )
     print(
         f"✓ Explicit claims not overridden: exp={decoded2.payload['exp']}, iat={decoded2.payload['iat']}"
     )
@@ -86,12 +86,12 @@ def test_paseto_instance_basic():
     payload_simple = {"sub": "user789"}
     token3 = paseto_no_defaults.encode(key, payload_simple, purpose="local")
     decoded3 = paseto_no_defaults.decode(token3, key, purpose="local")
-    assert (
-        "exp" not in decoded3.payload
-    ), "exp should not be added when default_exp is None"
-    assert (
-        "iat" not in decoded3.payload
-    ), "iat should not be added when include_iat is False"
+    assert "exp" not in decoded3.payload, (
+        "exp should not be added when default_exp is None"
+    )
+    assert "iat" not in decoded3.payload, (
+        "iat should not be added when include_iat is False"
+    )
     print("✓ No defaults applied when not configured")
     print()
 

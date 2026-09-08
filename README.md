@@ -132,9 +132,9 @@ from fast_paseto import Paseto, generate_symmetric_key
 
 # Create a configured instance
 paseto = Paseto(
-    default_exp=3600,    # Tokens expire in 1 hour
-    include_iat=True,    # Auto-add issued-at timestamp
-    leeway=60,           # Allow 60s clock skew on verification
+    default_exp=3600,  # Tokens expire in 1 hour
+    include_iat=True,  # Auto-add issued-at timestamp
+    leeway=60,  # Allow 60s clock skew on verification
 )
 
 key = generate_symmetric_key()
@@ -183,9 +183,9 @@ key_type, key_bytes = fast_paseto.from_paserk(paserk)
 
 ```python
 # Generate deterministic key identifiers
-lid = fast_paseto.generate_lid(symmetric_key)   # k4.lid.XXXX...
-sid = fast_paseto.generate_sid(secret_key)      # k4.sid.XXXX...
-pid = fast_paseto.generate_pid(public_key)      # k4.pid.XXXX...
+lid = fast_paseto.generate_lid(symmetric_key)  # k4.lid.XXXX...
+sid = fast_paseto.generate_sid(secret_key)  # k4.sid.XXXX...
+pid = fast_paseto.generate_pid(public_key)  # k4.pid.XXXX...
 ```
 
 ### Key Wrapping
@@ -229,13 +229,16 @@ with open("public_key.pem") as f:
 import msgpack
 import fast_paseto
 
+
 class MsgPackSerializer:
     def dumps(self, obj):
         return msgpack.packb(obj)
 
+
 class MsgPackDeserializer:
     def loads(self, data):
         return msgpack.unpackb(data)
+
 
 token = fast_paseto.encode(
     key=key,

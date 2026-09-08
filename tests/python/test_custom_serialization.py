@@ -31,16 +31,16 @@ def test_custom_serializer_json_module():
 
     # Encode with json as serializer
     token = fast_paseto.encode(key, payload, purpose="local", serializer=serializer)
-    assert token.startswith(
-        "v4.local."
-    ), f"Token should start with 'v4.local.', got: {token[:20]}"
+    assert token.startswith("v4.local."), (
+        f"Token should start with 'v4.local.', got: {token[:20]}"
+    )
     print(f"✓ Generated token with json serializer: {token[:50]}...")
 
     # Decode with json as deserializer
     decoded = fast_paseto.decode(token, key, purpose="local", deserializer=serializer)
-    assert (
-        decoded.payload == payload
-    ), f"Payload mismatch: {decoded.payload} != {payload}"
+    assert decoded.payload == payload, (
+        f"Payload mismatch: {decoded.payload} != {payload}"
+    )
     print("✓ Custom serializer (json module) works")
     print()
 
@@ -70,9 +70,9 @@ def test_custom_serializer_class():
 
     # Decode with custom deserializer
     decoded = fast_paseto.decode(token, key, purpose="local", deserializer=serializer)
-    assert (
-        decoded.payload == payload
-    ), f"Payload mismatch: {decoded.payload} != {payload}"
+    assert decoded.payload == payload, (
+        f"Payload mismatch: {decoded.payload} != {payload}"
+    )
     print("✓ Custom serializer class works")
     print()
 

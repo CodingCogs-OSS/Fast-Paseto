@@ -22,9 +22,9 @@ def test_basic_local_encode_decode():
     token = fast_paseto.encode(key, payload, purpose="local")
 
     # Verify token format
-    assert token.startswith(
-        "v4.local."
-    ), f"Token should start with 'v4.local.', got: {token[:20]}"
+    assert token.startswith("v4.local."), (
+        f"Token should start with 'v4.local.', got: {token[:20]}"
+    )
     print(f"✓ Generated token: {token[:50]}...")
 
     # Decode the token
@@ -32,9 +32,9 @@ def test_basic_local_encode_decode():
 
     # Verify Token object
     assert decoded.version == "v4", f"Version should be 'v4', got: {decoded.version}"
-    assert (
-        decoded.purpose == "local"
-    ), f"Purpose should be 'local', got: {decoded.purpose}"
+    assert decoded.purpose == "local", (
+        f"Purpose should be 'local', got: {decoded.purpose}"
+    )
     assert decoded.payload == payload, "Payload mismatch"
     assert decoded.footer is None, "Footer should be None"
 
@@ -56,9 +56,9 @@ def test_local_with_footer():
 
     # Encode with footer
     token = fast_paseto.encode(key, payload, purpose="local", footer=footer)
-    assert ".v4.local." in token or token.startswith(
-        "v4.local."
-    ), "Token should be v4.local"
+    assert ".v4.local." in token or token.startswith("v4.local."), (
+        "Token should be v4.local"
+    )
     print(f"✓ Generated token with footer: {token[:50]}...")
 
     # Decode with footer
@@ -82,9 +82,9 @@ def test_public_token():
 
     # Encode with secret key
     token = fast_paseto.encode(secret_key, payload, purpose="public")
-    assert token.startswith(
-        "v4.public."
-    ), f"Token should start with 'v4.public.', got: {token[:20]}"
+    assert token.startswith("v4.public."), (
+        f"Token should start with 'v4.public.', got: {token[:20]}"
+    )
     print(f"✓ Generated public token: {token[:50]}...")
 
     # Decode with public key

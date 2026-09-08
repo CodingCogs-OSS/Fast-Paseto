@@ -119,9 +119,9 @@ def test_custom_serializer_round_trip_json_module(payload):
     decoded = fast_paseto.decode(token, key, purpose="local", deserializer=serializer)
 
     # Verify round-trip: decoded payload should equal original payload
-    assert (
-        decoded.payload == payload
-    ), f"Round-trip failed: {decoded.payload} != {payload}"
+    assert decoded.payload == payload, (
+        f"Round-trip failed: {decoded.payload} != {payload}"
+    )
 
 
 @given(payload=payload_strategy)
@@ -146,9 +146,9 @@ def test_custom_serializer_round_trip_custom_class(payload):
     decoded = fast_paseto.decode(token, key, purpose="local", deserializer=serializer)
 
     # Verify round-trip: decoded payload should equal original payload
-    assert (
-        decoded.payload == payload
-    ), f"Round-trip failed: {decoded.payload} != {payload}"
+    assert decoded.payload == payload, (
+        f"Round-trip failed: {decoded.payload} != {payload}"
+    )
 
 
 @given(payload=payload_strategy)
@@ -173,9 +173,9 @@ def test_custom_serializer_round_trip_bytes_serializer(payload):
     decoded = fast_paseto.decode(token, key, purpose="local", deserializer=serializer)
 
     # Verify round-trip: decoded payload should equal original payload
-    assert (
-        decoded.payload == payload
-    ), f"Round-trip failed: {decoded.payload} != {payload}"
+    assert decoded.payload == payload, (
+        f"Round-trip failed: {decoded.payload} != {payload}"
+    )
 
 
 @given(payload=payload_strategy, footer=footer_strategy)
@@ -203,15 +203,15 @@ def test_custom_serializer_round_trip_with_footer(payload, footer):
     )
 
     # Verify round-trip: decoded payload should equal original payload
-    assert (
-        decoded.payload == payload
-    ), f"Payload round-trip failed: {decoded.payload} != {payload}"
+    assert decoded.payload == payload, (
+        f"Payload round-trip failed: {decoded.payload} != {payload}"
+    )
 
     # Verify footer round-trip
     if footer is not None:
-        assert (
-            decoded.footer == footer
-        ), f"Footer round-trip failed: {decoded.footer} != {footer}"
+        assert decoded.footer == footer, (
+            f"Footer round-trip failed: {decoded.footer} != {footer}"
+        )
 
 
 @given(payload=payload_strategy)
@@ -240,9 +240,9 @@ def test_custom_serializer_round_trip_public_token(payload):
     )
 
     # Verify round-trip: decoded payload should equal original payload
-    assert (
-        decoded.payload == payload
-    ), f"Round-trip failed: {decoded.payload} != {payload}"
+    assert decoded.payload == payload, (
+        f"Round-trip failed: {decoded.payload} != {payload}"
+    )
 
 
 @given(payload=payload_strategy)
@@ -270,9 +270,9 @@ def test_custom_serializer_round_trip_paseto_instance(payload):
     decoded = paseto.decode(token, key, deserializer=serializer)
 
     # Verify round-trip: decoded payload should equal original payload
-    assert (
-        decoded.payload == payload
-    ), f"Round-trip failed: {decoded.payload} != {payload}"
+    assert decoded.payload == payload, (
+        f"Round-trip failed: {decoded.payload} != {payload}"
+    )
 
 
 if __name__ == "__main__":
